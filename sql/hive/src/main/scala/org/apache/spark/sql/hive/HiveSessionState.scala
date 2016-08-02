@@ -21,33 +21,29 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.analysis.Analyzer
 import org.apache.spark.sql.execution.SparkPlanner
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.hive.client.HiveClient
 import org.apache.spark.sql.internal.SessionState
 
 
 /**
  * A class that holds all session-specific state in a given [[SparkSession]] backed by Hive.
  */
-private[hive] class HiveSessionState(sparkSession: SparkSession)
+private[hive] class HiveSessionState(sparkSession: SparkSession,
+    externCatalog: HiveExternalCatalog)
   extends SessionState(sparkSession) {
 
   self =>
 
-  private lazy val sharedState: HiveSharedState = {
-    sparkSession.sharedState.asInstanceOf[HiveSharedState]
-  }
-
   /**
    * A Hive client used for interacting with the metastore.
    */
-  lazy val metadataHive: HiveClient = sharedState.metadataHive.newSession()
+  lazy val metadataHive = externCatalog.sessionClient
 
   /**
    * Internal catalog for managing table and database states.
    */
   override lazy val catalog = {
     new HiveSessionCatalog(
-      sharedState.externalCatalog,
+      externCatalog,
       metadataHive,
       sparkSession,
       functionResourceLoader,
@@ -64,12 +60,7 @@ private[hive] class HiveSessionState(sparkSession: SparkSession)
       override val extendedResolutionRules =
         catalog.ParquetConversions ::
         catalog.OrcConversions ::
-        catalog.CreateTables ::
-        PreprocessTableInsertion(conf) ::
-        DataSourceAnalysis(conf) ::
-        (if (conf.runSQLonFile) new ResolveDataSource(sparkSession) :: Nil else Nil)
-
-      override val extendedCheckRules = Seq(PreWriteCheck(conf, catalog))
+        catalog.CreateTables :: Nil else Nil)
     }
   }
 
@@ -83,17 +74,8 @@ private[hive] class HiveSessionState(sparkSession: SparkSession)
 
       override def strategies: Seq[Strategy] = {
         experimentalMethods.extraStrategies ++ Seq(
-          FileSourceStrategy,
-          DataSourceStrategy,
-          DDLStrategy,
-          SpecialLimits,
-          InMemoryScans,
           HiveTableScans,
-          DataSinks,
-          Scripts,
-          Aggregation,
-          JoinSelection,
-          BasicOperators
+          DataSinks
         )
       }
     }

@@ -27,15 +27,30 @@ import org.apache.spark.sql.catalyst.analysis.NoSuchDatabaseException
  * can be accessed in multiple threads. This is an external catalog because it is expected to
  * interact with external systems.
  *
+ * The two type parameters are for getSessionState only. Refers to the comments there
+ *
  * Implementations should throw [[NoSuchDatabaseException]] when databases don't exist.
  */
-abstract class ExternalCatalog {
+abstract class ExternalCatalog[S, T] {
   import CatalogTypes.TablePartitionSpec
 
   protected def requireDbExists(db: String): Unit = {
     if (!databaseExists(db)) {
       throw new NoSuchDatabaseException(db)
     }
+  }
+
+  /**
+   * Due to the current module dependence from SQL core to catalyst with
+   * SparkSession in the core, the type parameter is used here which would be
+   * unnecessary otherwise. Needs to be revisited when and should the module dependency
+   * be changed
+   * @param sparkSession SparkSession
+   * @return SessionState
+   */
+  def getSessionState(sparkSession: S): T = {
+    throw new UnsupportedOperationException("getSessionState not supported for class "
+      + this.getClass.getName)
   }
 
   // --------------------------------------------------------------------------

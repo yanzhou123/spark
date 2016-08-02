@@ -38,7 +38,7 @@ import org.apache.spark.sql.util.ExecutionListenerManager
 /**
  * A class that holds all session-specific state in a given [[SparkSession]].
  */
-private[sql] class SessionState(sparkSession: SparkSession) {
+private[sql] class SessionState(sparkSession: SparkSession, parent: Option[SessionState] = None) {
 
   // Note: These are all lazy vals because they depend on each other (e.g. conf) and we
   // want subclasses to override some of the fields. Otherwise, we would get a lot of NPEs.
@@ -46,7 +46,11 @@ private[sql] class SessionState(sparkSession: SparkSession) {
   /**
    * SQL-specific key-value configurations.
    */
-  lazy val conf: SQLConf = new SQLConf
+  lazy val conf: SQLConf = parent.map(_.conf).getOrElse(new SQLConf)
+
+  private def withParent[T](parentVal: SessionState => T)(newVal: T): T = {
+    parent.map(parentVal(_)).getOrElse(newVal)
+  }
 
   def newHadoopConf(): Configuration = {
     val hadoopConf = new Configuration(sparkSession.sparkContext.hadoopConfiguration)
@@ -69,12 +73,14 @@ private[sql] class SessionState(sparkSession: SparkSession) {
   /**
    * Internal catalog for managing functions registered by the user.
    */
-  lazy val functionRegistry: FunctionRegistry = FunctionRegistry.builtin.copy()
+  lazy val functionRegistry: FunctionRegistry = withParent[FunctionRegistry](
+    (s: SessionState) => s.functionRegistry)(FunctionRegistry.builtin.copy())
 
   /**
    * A class for loading resources specified by a function.
    */
-  lazy val functionResourceLoader: FunctionResourceLoader = {
+  lazy val functionResourceLoader: FunctionResourceLoader = withParent[FunctionResourceLoader](
+    (s: SessionState) => s.functionResourceLoader) {
     new FunctionResourceLoader {
       override def loadResource(resource: FunctionResource): Unit = {
         resource.resourceType match {
@@ -103,7 +109,8 @@ private[sql] class SessionState(sparkSession: SparkSession) {
    * Interface exposed to the user for registering user-defined functions.
    * Note that the user-defined functions must be deterministic.
    */
-  lazy val udf: UDFRegistration = new UDFRegistration(functionRegistry)
+  lazy val udf: UDFRegistration = withParent[UDFRegistration](
+    (s: SessionState) => s.udf)(new UDFRegistration(functionRegistry))
 
   /**
    * Logical query plan analyzer for resolving unresolved attributes and relations.
