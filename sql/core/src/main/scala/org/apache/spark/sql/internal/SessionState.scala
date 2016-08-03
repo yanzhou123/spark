@@ -115,17 +115,7 @@ private[sql] class SessionState(sparkSession: SparkSession, parent: Option[Sessi
   /**
    * Logical query plan analyzer for resolving unresolved attributes and relations.
    */
-  lazy val analyzer: Analyzer = {
-    new Analyzer(catalog, conf) {
-      override val extendedResolutionRules =
-        PreprocessTableInsertion(conf) ::
-        new FindDataSourceTable(sparkSession) ::
-        DataSourceAnalysis(conf) ::
-        (if (conf.runSQLonFile) new ResolveDataSource(sparkSession) :: Nil else Nil)
-
-      override val extendedCheckRules = Seq(datasources.PreWriteCheck(conf, catalog))
-    }
-  }
+  lazy val analyzer: Analyzer = new Analyzer(catalog, conf)
 
   /**
    * Logical query plan optimizer.
@@ -141,7 +131,9 @@ private[sql] class SessionState(sparkSession: SparkSession, parent: Option[Sessi
    * Planner that converts optimized logical plans to physical plans.
    */
   def planner: SparkPlanner =
-    new SparkPlanner(sparkSession.sparkContext, conf, experimentalMethods.extraStrategies)
+    new SparkPlanner(sparkSession.sparkContext, conf, experimentalMethods.extraStrategies) {
+      override def strategies: Seq[Strategy] = Nil
+    }
 
   /**
    * An interface to register custom [[org.apache.spark.sql.util.QueryExecutionListener]]s

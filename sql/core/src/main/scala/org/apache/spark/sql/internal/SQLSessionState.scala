@@ -17,23 +17,17 @@
 
 package org.apache.spark.sql.internal
 
-import java.io.File
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
 
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.analysis.{Analyzer, FunctionRegistry}
-import org.apache.spark.sql.catalyst.catalog.{ArchiveResource, _}
+import org.apache.spark.sql.catalyst.analysis.Analyzer
 import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.parser.ParserInterface
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.{RuleExecutor, Rule}
 import org.apache.spark.sql.execution._
-import org.apache.spark.sql.execution.command.AnalyzeTableCommand
-import org.apache.spark.sql.execution.datasources.{DataSourceAnalysis, FindDataSourceTable, PreprocessTableInsertion, ResolveDataSource}
-import org.apache.spark.sql.streaming.{StreamingQuery, StreamingQueryManager}
-import org.apache.spark.sql.util.ExecutionListenerManager
+import org.apache.spark.sql.execution.datasources.{ResolveDataSource, DataSourceAnalysis, FindDataSourceTable, PreprocessTableInsertion}
 
 import scala.collection.mutable
 
@@ -46,7 +40,23 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
   // Note: These are all lazy vals because they depend on each other (e.g. conf) and we
   // want subclasses to override some of the fields. Otherwise, we would get a lot of NPEs.
 
-  private lazy val inMemState = new SessionState(sparkSession, Some(this))
+  private lazy val inMemState = new SessionState(sparkSession, Some(this)) {
+    override val analyzer: Analyzer = {
+      new Analyzer(catalog, conf) {
+        override val extendedResolutionRules =
+          PreprocessTableInsertion(conf) ::
+            new FindDataSourceTable(sparkSession) ::
+            DataSourceAnalysis(conf) ::
+            (if (conf.runSQLonFile) new ResolveDataSource(sparkSession) :: Nil else Nil)
+
+        override val extendedCheckRules = Seq(datasources.PreWriteCheck(conf, catalog))
+      }
+    }
+
+    override def planner: SparkPlanner =
+      new SparkPlanner(sparkSession.sparkContext, conf, experimentalMethods.extraStrategies)
+
+  }
   private lazy val sessionStateMap = {
     val result = new mutable.HashMap[String, SessionState]()
     result.put("in-memory", inMemState)
