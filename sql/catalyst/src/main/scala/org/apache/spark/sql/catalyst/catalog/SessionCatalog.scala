@@ -46,7 +46,7 @@ object SessionCatalog {
  * This class must be thread-safe.
  */
 class SessionCatalog(
-    externalCatalog: ExternalCatalog,
+    val externalCatalog: ExternalCatalog,
     functionResourceLoader: FunctionResourceLoader,
     functionRegistry: FunctionRegistry,
     conf: CatalystConf,

@@ -41,7 +41,7 @@ import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.execution.command.CacheTableCommand
 import org.apache.spark.sql.hive._
 import org.apache.spark.sql.hive.client.HiveClient
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.{SQLConf, SharedState}
 import org.apache.spark.util.{ShutdownHookManager, Utils}
 
 // SPARK-3729: Test key required to check for initialization errors with config.
@@ -512,9 +512,9 @@ private[hive] class TestHiveSharedState(
     warehousePath: File,
     scratchDirPath: File,
     metastoreTemporaryConf: Map[String, String])
-  extends HiveSharedState(sc) {
+  extends SharedState(sc) {
 
-  override lazy val metadataHive: HiveClient = {
+  lazy val metadataHive: HiveClient = {
     TestHiveContext.newClientForMetadata(
       sc.conf, sc.hadoopConfiguration, warehousePath, scratchDirPath, metastoreTemporaryConf)
   }

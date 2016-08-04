@@ -48,7 +48,8 @@ abstract class ExternalCatalog {
    * @param sparkSession SparkSession
    * @return SessionState
    */
-  def getSessionState[S, T](sparkSession: S): T = {
+
+  def getSessionState(sparkSession: Any): Any = {
     throw new UnsupportedOperationException("getSessionState not supported for class "
       + this.getClass.getName)
   }

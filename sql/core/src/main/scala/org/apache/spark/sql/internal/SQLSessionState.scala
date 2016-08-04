@@ -23,10 +23,11 @@ import scala.util.control.NonFatal
 
 import org.apache.hadoop.conf.Configuration
 
+import org.apache.spark.SparkContext
 import org.apache.spark.internal.config.CATALOG_IMPLEMENTATION
 import org.apache.spark.sql.{Strategy, _}
 import org.apache.spark.sql.catalyst.analysis.Analyzer
-import org.apache.spark.sql.catalyst.optimizer.Optimizer
+import org.apache.spark.sql.catalyst.catalog.ExternalCatalog
 import org.apache.spark.sql.catalyst.parser.ParserInterface
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -44,7 +45,7 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
   // want subclasses to override some of the fields. Otherwise, we would get a lot of NPEs.
 
   private lazy val inMemState = new SessionState(sparkSession, Some(this)) {
-    override val analyzer: Analyzer = {
+    override lazy val analyzer: Analyzer = {
       new Analyzer(catalog, conf) {
         override val extendedResolutionRules =
           PreprocessTableInsertion(conf) ::
@@ -77,6 +78,7 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
     List(inMemState) ++ sessionStateMap.clone.remove("in-memory").toList
   }
 
+  private val HIVE_EXTERNAL_CATALOG_CLASS_NAME = "org.apache.spark.sql.hive.HiveExternalCatalog"
   private val HIVE_SESSION_STATE_CLASS_NAME = "org.apache.spark.sql.hive.HiveSessionState"
 
   /**
@@ -84,12 +86,34 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
    * are supported for Hive and all other data sources
    */
   val currentSessionState = sparkSession.sparkContext.conf.get(CATALOG_IMPLEMENTATION.key) match {
-    case "hive" => sessionStateMap.get("hive").orElse {
-      val hiveSessionState = reflect[SessionState, SparkSession, Some[SessionState]](
-      HIVE_SESSION_STATE_CLASS_NAME, sparkSession, Some(this))
-      sessionStateMap.put("hive", hiveSessionState)
-      Some(hiveSessionState)}
+    case "hive" => val result = sessionStateMap.get("hive").orElse {
+        val hiveExternCatalog = reflect[ExternalCatalog, SparkContext](
+          HIVE_EXTERNAL_CATALOG_CLASS_NAME, sparkSession.sparkContext
+        )
+        sparkSession.sharedState.externalCatalog = hiveExternCatalog
+        val hiveSessionState = reflect[SessionState, SparkSession, Some[SessionState]](
+          HIVE_SESSION_STATE_CLASS_NAME, sparkSession, Some(this))
+        sessionStateMap.put("hive", hiveSessionState)
+        Some(hiveSessionState)}
+      sparkSession.sharedState.externalCatalog = result.get.catalog.externalCatalog
+      result
     case _ => Some(inMemState)
+  }
+
+  /**
+    * Helper method to create an instance of [[T]] using a single-arg constructor that
+    * accepts [[Arg]].
+    */
+  private def reflect[T, Arg <: AnyRef](className: String, ctorArg: Arg)
+                                                        (implicit ctorArgTag: ClassTag[Arg]): T = {
+    try {
+      val clazz = Utils.classForName(className)
+      val ctor = clazz.getDeclaredConstructor(ctorArgTag.runtimeClass)
+      ctor.newInstance(ctorArg).asInstanceOf[T]
+    } catch {
+      case NonFatal(e) =>
+        throw new IllegalArgumentException(s"Error while instantiating '$className':", e)
+    }
   }
 
   /**
@@ -118,9 +142,9 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
     currentSessionState.map(_.newHadoopConfWithOptions(options)).getOrElse(null)
 
   override lazy val experimentalMethods: ExperimentalMethods = new ExperimentalMethods {
-    override var extraStrategies =
+    extraStrategies =
       combine[Strategy]((s: SessionState) => s.experimentalMethods.extraStrategies)
-    override var extraOptimizations =
+    extraOptimizations =
       combine[Rule[LogicalPlan]]((s: SessionState) => s.experimentalMethods.extraOptimizations)
   }
 
@@ -144,11 +168,15 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
   }
 
   /**
-   * Logical query plan optimizer.
+   * Logical query plan optimizer. Can't make it composable now
+    * due to the nested type of Batch per Optimizer instance which
+    * makes the concatenation of batches impossible.
    */
+    /*
   override lazy val optimizer: Optimizer = new Optimizer(catalog, conf) {
     override def batches = orderedSessionState.map(_.optimizer.batches).reduceLeft(_ ++ _)
   }
+  */
 
   /**
    * Parser that extracts expressions, plans, table identifiers etc. from SQL texts.
