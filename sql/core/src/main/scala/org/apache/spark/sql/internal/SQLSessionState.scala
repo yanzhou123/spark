@@ -101,9 +101,9 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
   }
 
   /**
-    * Helper method to create an instance of [[T]] using a single-arg constructor that
-    * accepts [[Arg]].
-    */
+   * Helper method to create an instance of [[T]] using a single-arg constructor that
+   * accepts [[Arg]].
+   */
   private def reflect[T, Arg <: AnyRef](className: String, ctorArg: Arg)
                                                         (implicit ctorArgTag: ClassTag[Arg]): T = {
     try {
@@ -117,9 +117,9 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
   }
 
   /**
-    * Helper method to create an instance of [[T]] using a two-arg constructor that
-    * accepts [[Arg1]] and [[Arg2]].
-    */
+   * Helper method to create an instance of [[T]] using a two-arg constructor that
+   * accepts [[Arg1]] and [[Arg2]].
+   */
   private def reflect[T, Arg1 <: AnyRef, Arg2 <: AnyRef](className: String,
       ctorArg1: Arg1, ctorArg2: Arg2)
       (implicit ctorArgTag1: ClassTag[Arg1], ctorArgTag2: ClassTag[Arg2]): T = {
