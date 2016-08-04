@@ -31,7 +31,7 @@ import org.apache.spark.sql.catalyst.analysis.NoSuchDatabaseException
  *
  * Implementations should throw [[NoSuchDatabaseException]] when databases don't exist.
  */
-abstract class ExternalCatalog[S, T] {
+abstract class ExternalCatalog {
   import CatalogTypes.TablePartitionSpec
 
   protected def requireDbExists(db: String): Unit = {
@@ -48,7 +48,7 @@ abstract class ExternalCatalog[S, T] {
    * @param sparkSession SparkSession
    * @return SessionState
    */
-  def getSessionState(sparkSession: S): T = {
+  def getSessionState[S, T](sparkSession: S): T = {
     throw new UnsupportedOperationException("getSessionState not supported for class "
       + this.getClass.getName)
   }

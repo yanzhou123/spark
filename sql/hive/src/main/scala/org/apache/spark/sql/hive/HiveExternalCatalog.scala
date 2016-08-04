@@ -38,7 +38,7 @@ import org.apache.spark.sql.hive.client.HiveClient
  * All public methods must be synchronized for thread-safety.
  */
 private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
-  extends ExternalCatalog[SparkSession, HiveSessionCatalog] with Logging {
+  extends ExternalCatalog with Logging {
 
   import CatalogTypes.TablePartitionSpec
 
@@ -53,7 +53,8 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
 
   def sessionClient: HiveClient = client.newSession()
 
-  override def getSessionState(sparkSession: SparkSession): HiveSessionState = {
+  override def getSessionState[SparkSession, HiveSessionState](sparkSession: SparkSession)
+  : HiveSessionState = {
     new HiveSessionState(sparkSession, this)
   }
 

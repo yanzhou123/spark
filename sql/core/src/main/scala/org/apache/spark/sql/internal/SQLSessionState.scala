@@ -24,7 +24,7 @@ import scala.util.control.NonFatal
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.internal.config.CATALOG_IMPLEMENTATION
-import org.apache.spark.sql._
+import org.apache.spark.sql.{Strategy, _}
 import org.apache.spark.sql.catalyst.analysis.Analyzer
 import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.parser.ParserInterface
