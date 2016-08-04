@@ -513,11 +513,7 @@ private[hive] class TestHiveSharedState(
     scratchDirPath: File,
     metastoreTemporaryConf: Map[String, String])
   extends SharedState(sc) {
-
-  lazy val metadataHive: HiveClient = {
-    TestHiveContext.newClientForMetadata(
-      sc.conf, sc.hadoopConfiguration, warehousePath, scratchDirPath, metastoreTemporaryConf)
-  }
+  externalCatalog = new HiveExternalCatalog(sc)
 }
 
 
