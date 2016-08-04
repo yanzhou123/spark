@@ -45,8 +45,8 @@ object SessionCatalog {
  *
  * This class must be thread-safe.
  */
-class SessionCatalog(
-    externalCatalog: ExternalCatalog,
+class SessionCatalog[S, T](
+    externalCatalog: ExternalCatalog[S, T],
     functionResourceLoader: FunctionResourceLoader,
     functionRegistry: FunctionRegistry,
     conf: CatalystConf,
@@ -56,7 +56,7 @@ class SessionCatalog(
 
   // For testing only.
   def this(
-      externalCatalog: ExternalCatalog,
+      externalCatalog: ExternalCatalog[S, T],
       functionRegistry: FunctionRegistry,
       conf: CatalystConf) {
     this(
@@ -68,7 +68,7 @@ class SessionCatalog(
   }
 
   // For testing only.
-  def this(externalCatalog: ExternalCatalog) {
+  def this(externalCatalog: ExternalCatalog[S, T]) {
     this(externalCatalog, new SimpleFunctionRegistry, new SimpleCatalystConf(true))
   }
 

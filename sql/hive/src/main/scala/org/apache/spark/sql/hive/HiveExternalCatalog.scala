@@ -19,17 +19,15 @@ package org.apache.spark.sql.hive
 
 import java.util
 
-import org.apache.spark.SparkContext
-
 import scala.util.control.NonFatal
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hive.ql.metadata.HiveException
 import org.apache.thrift.TException
 
+import org.apache.spark.sql.{AnalysisException, SparkSession}
+import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{SparkSession, AnalysisException}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.hive.client.HiveClient
@@ -52,7 +50,8 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
   lazy val client: HiveClient =
     HiveUtils.newClientForMetadata(sparkContext.conf, sparkContext.hadoopConfiguration)
   lazy val hadoopConf = sparkContext.hadoopConfiguration
-  def sessionClient = client.newSession()
+
+  def sessionClient: HiveClient = client.newSession()
 
   override def getSessionState(sparkSession: SparkSession): HiveSessionState = {
     new HiveSessionState(sparkSession, this)

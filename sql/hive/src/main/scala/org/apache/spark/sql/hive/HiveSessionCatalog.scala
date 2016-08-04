@@ -48,7 +48,7 @@ private[sql] class HiveSessionCatalog(
     functionRegistry: FunctionRegistry,
     conf: SQLConf,
     hadoopConf: Configuration)
-  extends SessionCatalog(
+  extends SessionCatalog[SparkSession, HiveSessionCatalog](
     externalCatalog,
     functionResourceLoader,
     functionRegistry,

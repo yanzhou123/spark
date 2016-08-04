@@ -21,9 +21,7 @@ import java.beans.Introspector
 import java.util.concurrent.atomic.AtomicReference
 
 import scala.collection.JavaConverters._
-import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
-import scala.util.control.NonFatal
 
 import org.apache.spark.{SPARK_VERSION, SparkConf, SparkContext}
 import org.apache.spark.annotation.{DeveloperApi, Experimental}
@@ -667,7 +665,6 @@ class SparkSession private(
       AttributeReference(f.name, f.dataType, f.nullable)()
     }
   }
-
 }
 
 
@@ -910,37 +907,6 @@ object SparkSession {
 
   private val HIVE_SHARED_STATE_CLASS_NAME = "org.apache.spark.sql.hive.HiveSharedState"
   private val HIVE_SESSION_STATE_CLASS_NAME = "org.apache.spark.sql.hive.HiveSessionState"
-
-  private def sharedStateClassName(conf: SparkConf): String = {
-    conf.get(CATALOG_IMPLEMENTATION) match {
-      case "hive" => HIVE_SHARED_STATE_CLASS_NAME
-      case "in-memory" => classOf[SharedState].getCanonicalName
-    }
-  }
-
-  private def sessionStateClassName(conf: SparkConf): String = {
-    conf.get(CATALOG_IMPLEMENTATION) match {
-      case "hive" => HIVE_SESSION_STATE_CLASS_NAME
-      case "in-memory" => classOf[SessionState].getCanonicalName
-    }
-  }
-
-  /**
-   * Helper method to create an instance of [[T]] using a single-arg constructor that
-   * accepts an [[Arg]].
-   */
-  private def reflect[T, Arg <: AnyRef](
-      className: String,
-      ctorArg: Arg)(implicit ctorArgTag: ClassTag[Arg]): T = {
-    try {
-      val clazz = Utils.classForName(className)
-      val ctor = clazz.getDeclaredConstructor(ctorArgTag.runtimeClass)
-      ctor.newInstance(ctorArg).asInstanceOf[T]
-    } catch {
-      case NonFatal(e) =>
-        throw new IllegalArgumentException(s"Error while instantiating '$className':", e)
-    }
-  }
 
   /**
    * Return true if Hive classes can be loaded, otherwise false.

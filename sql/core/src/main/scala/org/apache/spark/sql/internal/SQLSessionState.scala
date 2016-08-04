@@ -17,19 +17,22 @@
 
 package org.apache.spark.sql.internal
 
+import scala.collection.mutable
+import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 import org.apache.hadoop.conf.Configuration
 
+import org.apache.spark.internal.config.CATALOG_IMPLEMENTATION
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.analysis.Analyzer
 import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.parser.ParserInterface
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.rules.{RuleExecutor, Rule}
+import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
-import org.apache.spark.sql.execution.datasources.{ResolveDataSource, DataSourceAnalysis, FindDataSourceTable, PreprocessTableInsertion}
-
-import scala.collection.mutable
+import org.apache.spark.sql.execution.datasources.{DataSourceAnalysis, FindDataSourceTable, PreprocessTableInsertion, ResolveDataSource}
+import org.apache.spark.util.Utils
 
 
 /**
@@ -57,6 +60,7 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
       new SparkPlanner(sparkSession.sparkContext, conf, experimentalMethods.extraStrategies)
 
   }
+
   private lazy val sessionStateMap = {
     val result = new mutable.HashMap[String, SessionState]()
     result.put("in-memory", inMemState)
@@ -73,32 +77,58 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
     List(inMemState) ++ sessionStateMap.clone.remove("in-memory").toList
   }
 
+  private val HIVE_SESSION_STATE_CLASS_NAME = "org.apache.spark.sql.hive.HiveSessionState"
+
   /**
    * current active session state: will be made val on in-memory once data source functionalities
    * are supported for Hive and all other data sources
    */
-  var currentSessionState = sessionStateMap.get("in-memory")
+  val currentSessionState = sparkSession.sparkContext.conf.get(CATALOG_IMPLEMENTATION.key) match {
+    case "hive" => sessionStateMap.get("hive").orElse {
+      val hiveSessionState = reflect[SessionState, SparkSession, Some[SessionState]](
+      HIVE_SESSION_STATE_CLASS_NAME, sparkSession, Some(this))
+      sessionStateMap.put("hive", hiveSessionState)
+      Some(hiveSessionState)}
+    case _ => Some(inMemState)
+  }
+
+  /**
+    * Helper method to create an instance of [[T]] using a two-arg constructor that
+    * accepts [[Arg1]] and [[Arg2]].
+    */
+  private def reflect[T, Arg1 <: AnyRef, Arg2 <: AnyRef](className: String,
+      ctorArg1: Arg1, ctorArg2: Arg2)
+      (implicit ctorArgTag1: ClassTag[Arg1], ctorArgTag2: ClassTag[Arg2]): T = {
+    try {
+      val clazz = Utils.classForName(className)
+      val ctor = clazz.getDeclaredConstructor(ctorArgTag1.runtimeClass, ctorArgTag2.runtimeClass)
+      ctor.newInstance(ctorArg1, ctorArg2).asInstanceOf[T]
+    } catch {
+      case NonFatal(e) =>
+        throw new IllegalArgumentException(s"Error while instantiating '$className':", e)
+    }
+  }
 
   /**
    * SQL-specific key-value configurations.
    */
-  override def conf: SQLConf = currentSessionState.map(_.conf).getOrElse(null)
+  override lazy val conf: SQLConf = currentSessionState.map(_.conf).getOrElse(null)
 
   override def newHadoopConfWithOptions(options: Map[String, String]): Configuration =
     currentSessionState.map(_.newHadoopConfWithOptions(options)).getOrElse(null)
 
-  override def experimentalMethods = new ExperimentalMethods {
+  override lazy val experimentalMethods: ExperimentalMethods = new ExperimentalMethods {
     override var extraStrategies =
       combine[Strategy]((s: SessionState) => s.experimentalMethods.extraStrategies)
     override var extraOptimizations =
-      combine[Rule[LogicalPlan]]((s: SessionState)=> s.experimentalMethods.extraOptimizations)
+      combine[Rule[LogicalPlan]]((s: SessionState) => s.experimentalMethods.extraOptimizations)
   }
 
 
   /**
    * Internal catalog for managing table and database states.
    */
-  override def catalog = currentSessionState.map(_.catalog).getOrElse(null)
+  override lazy val catalog = currentSessionState.map(_.catalog).getOrElse(null)
 
   /**
    * Logical query plan analyzer for resolving unresolved attributes and relations.
