@@ -21,6 +21,7 @@ import java.util
 
 import scala.util.control.NonFatal
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hive.ql.metadata.HiveException
 import org.apache.thrift.TException
@@ -40,6 +41,13 @@ import org.apache.spark.sql.hive.client.HiveClient
 private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
   extends ExternalCatalog with Logging {
 
+  // For testing purpose only
+  def this(hiveClient: HiveClient, conf: Configuration) = {
+    this(null)
+    testClient = Some(hiveClient)
+    testConf = Some(conf)
+  }
+
   import CatalogTypes.TablePartitionSpec
 
   // Exceptions thrown by the hive client that we would like to wrap
@@ -47,9 +55,13 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
     classOf[HiveException].getCanonicalName,
     classOf[TException].getCanonicalName)
 
-  lazy val client: HiveClient =
-    HiveUtils.newClientForMetadata(sparkContext.conf, sparkContext.hadoopConfiguration)
-  lazy val hadoopConf = sparkContext.hadoopConfiguration
+  private var testClient: Option[HiveClient] = None
+  private var testConf: Option[Configuration] = None
+
+  lazy val client: HiveClient = testClient.getOrElse(
+    HiveUtils.newClientForMetadata(sparkContext.conf, sparkContext.hadoopConfiguration))
+
+  lazy val hadoopConf = testConf.getOrElse(sparkContext.hadoopConfiguration)
 
   def sessionClient: HiveClient = client.newSession()
 
