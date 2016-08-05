@@ -28,7 +28,7 @@ import org.apache.spark.sql.internal.SessionState
  * A class that holds all session-specific state in a given [[SparkSession]] backed by Hive.
  */
 private[hive] class HiveSessionState(sparkSession: SparkSession)
-  extends SessionState(sparkSession) {
+  extends SessionState(sparkSession, Some(sparkSession.sessionState)) {
 
   self =>
 
@@ -76,7 +76,8 @@ private[hive] class HiveSessionState(sparkSession: SparkSession)
       override def strategies: Seq[Strategy] = {
         experimentalMethods.extraStrategies ++ Seq(
           HiveTableScans,
-          DataSinks
+          DataSinks,
+          Scripts
         )
       }
     }

@@ -19,7 +19,6 @@ package org.apache.spark.sql.hive
 
 import org.apache.spark.sql.hive.test.TestHiveSingleton
 import org.apache.spark.sql.QueryTest
-import org.apache.spark.sql.internal.SharedState
 
 class HiveDataFrameSuite extends QueryTest with TestHiveSingleton {
   test("table name with schema") {
@@ -32,7 +31,7 @@ class HiveDataFrameSuite extends QueryTest with TestHiveSingleton {
   }
 
   test("SPARK-15887: hive-site.xml should be loaded") {
-    val hiveClient = spark.sharedState.asInstanceOf[SharedState].sparkContext.getConf
-    assert(hiveClient.get("hive.in.test", "") == "true")
+    val hiveClient = spark.sharedState.externalCatalog.asInstanceOf[HiveExternalCatalog].client
+    assert(hiveClient.getConf("hive.in.test", "") == "true")
   }
 }

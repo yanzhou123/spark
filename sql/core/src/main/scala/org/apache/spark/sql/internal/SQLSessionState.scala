@@ -91,8 +91,8 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
           HIVE_EXTERNAL_CATALOG_CLASS_NAME, sparkSession.sparkContext
         )
         sparkSession.sharedState.externalCatalog = hiveExternCatalog
-        val hiveSessionState = reflect[SessionState, SparkSession, Some[SessionState]](
-          HIVE_SESSION_STATE_CLASS_NAME, sparkSession, Some(this))
+        val hiveSessionState = reflect[SessionState, SparkSession](
+          HIVE_SESSION_STATE_CLASS_NAME, sparkSession)
         sessionStateMap.put("hive", hiveSessionState)
         Some(hiveSessionState)}
       sparkSession.sharedState.externalCatalog = result.get.catalog.externalCatalog
@@ -110,23 +110,6 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
       val clazz = Utils.classForName(className)
       val ctor = clazz.getDeclaredConstructor(ctorArgTag.runtimeClass)
       ctor.newInstance(ctorArg).asInstanceOf[T]
-    } catch {
-      case NonFatal(e) =>
-        throw new IllegalArgumentException(s"Error while instantiating '$className':", e)
-    }
-  }
-
-  /**
-   * Helper method to create an instance of [[T]] using a two-arg constructor that
-   * accepts [[Arg1]] and [[Arg2]].
-   */
-  private def reflect[T, Arg1 <: AnyRef, Arg2 <: AnyRef](className: String,
-      ctorArg1: Arg1, ctorArg2: Arg2)
-      (implicit ctorArgTag1: ClassTag[Arg1], ctorArgTag2: ClassTag[Arg2]): T = {
-    try {
-      val clazz = Utils.classForName(className)
-      val ctor = clazz.getDeclaredConstructor(ctorArgTag1.runtimeClass, ctorArgTag2.runtimeClass)
-      ctor.newInstance(ctorArg1, ctorArg2).asInstanceOf[T]
     } catch {
       case NonFatal(e) =>
         throw new IllegalArgumentException(s"Error while instantiating '$className':", e)
