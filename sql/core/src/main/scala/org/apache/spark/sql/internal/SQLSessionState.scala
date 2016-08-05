@@ -44,7 +44,9 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
   // Note: These are all lazy vals because they depend on each other (e.g. conf) and we
   // want subclasses to override some of the fields. Otherwise, we would get a lot of NPEs.
 
-  private lazy val inMemState = new SessionState(sparkSession, Some(this)) {
+  private lazy val inMemState = new SessionState(sparkSession) {
+    override lazy val parent: Option[SessionState] = Some(sparkSession.sessionState)
+
     override lazy val analyzer: Analyzer = {
       new Analyzer(catalog, conf) {
         override val extendedResolutionRules =
@@ -85,7 +87,8 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
    * current active session state: will be made val on in-memory once data source functionalities
    * are supported for Hive and all other data sources
    */
-  val currentSessionState = sparkSession.sparkContext.conf.get(CATALOG_IMPLEMENTATION.key) match {
+  lazy val currentSessionState = sparkSession.sparkContext.conf
+    .get(CATALOG_IMPLEMENTATION.key) match {
     case "hive" => val result = sessionStateMap.get("hive").orElse {
         val hiveExternCatalog = reflect[ExternalCatalog, SparkContext](
           HIVE_EXTERNAL_CATALOG_CLASS_NAME, sparkSession.sparkContext

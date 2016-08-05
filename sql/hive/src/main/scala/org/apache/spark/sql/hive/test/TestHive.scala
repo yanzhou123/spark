@@ -32,7 +32,7 @@ import org.apache.hadoop.hive.serde2.`lazy`.LazySimpleSerDe
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config.CATALOG_IMPLEMENTATION
-import org.apache.spark.sql.{SQLContext, SparkSession}
+import org.apache.spark.sql.{SparkSession, SQLContext}
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.analysis.FunctionRegistry.FunctionBuilder
 import org.apache.spark.sql.catalyst.expressions.ExpressionInfo
@@ -41,7 +41,7 @@ import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.execution.command.CacheTableCommand
 import org.apache.spark.sql.hive._
 import org.apache.spark.sql.hive.client.HiveClient
-import org.apache.spark.sql.internal.{SQLConf, SQLSessionState, SharedState}
+import org.apache.spark.sql.internal.{SharedState, SQLConf, SQLSessionState}
 import org.apache.spark.util.{ShutdownHookManager, Utils}
 
 // SPARK-3729: Test key required to check for initialization errors with config.
@@ -430,7 +430,7 @@ private[hive] class TestHiveSparkSession(
       sessionState.catalog.clearTempTables()
       sessionState.catalog.asInstanceOf[HiveSessionCatalog].invalidateCache()
 
-      sessionState.currentSessionState.asInstanceOf[HiveSessionState].metadataHive.reset()
+      sessionState.currentSessionState.get.asInstanceOf[HiveSessionState].metadataHive.reset()
 
       FunctionRegistry.getFunctionNames.asScala.filterNot(originalUDFs.contains(_)).
         foreach { udfName => FunctionRegistry.unregisterTemporaryUDF(udfName) }
@@ -439,7 +439,7 @@ private[hive] class TestHiveSparkSession(
       sessionState.conf.setConfString("fs.default.name", new File(".").toURI.toString)
       // It is important that we RESET first as broken hooks that might have been set could break
       // other sql exec here.
-      val client = sessionState.currentSessionState.asInstanceOf[HiveSessionState].metadataHive
+      val client = sessionState.currentSessionState.get.asInstanceOf[HiveSessionState].metadataHive
 
       client.runSqlHive("RESET")
       // For some reason, RESET does not reset the following variables...

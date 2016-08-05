@@ -34,6 +34,7 @@ import org.apache.spark.sql.execution.command.CreateHiveTableAsSelectLogicalPlan
 import org.apache.spark.sql.execution.datasources.{Partition => _, _}
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, ParquetOptions}
 import org.apache.spark.sql.hive.orc.OrcFileFormat
+import org.apache.spark.sql.internal.SQLSessionState
 import org.apache.spark.sql.types._
 
 
@@ -44,7 +45,8 @@ import org.apache.spark.sql.types._
  * cleaned up to integrate more nicely with [[HiveExternalCatalog]].
  */
 private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Logging {
-  private val sessionState = sparkSession.sessionState.asInstanceOf[HiveSessionState]
+  private lazy val sessionState = sparkSession.sessionState.asInstanceOf[SQLSessionState]
+    .currentSessionState.asInstanceOf[HiveSessionState]
   private val client = sparkSession.sharedState.externalCatalog.
     asInstanceOf[HiveExternalCatalog].client
 
