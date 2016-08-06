@@ -38,7 +38,7 @@ import org.apache.spark.sql.util.ExecutionListenerManager
 /**
  * A class that holds all session-specific state in a given [[SparkSession]].
  */
-private[sql] class SessionState(sparkSession: SparkSession) {
+private[sql] abstract class SessionState(sparkSession: SparkSession) {
 
   // Note: These are all lazy vals because they depend on each other (e.g. conf) and we
   // want subclasses to override some of the fields. Otherwise, we would get a lot of NPEs.
@@ -141,23 +141,22 @@ private[sql] class SessionState(sparkSession: SparkSession) {
    * An interface to register custom [[org.apache.spark.sql.util.QueryExecutionListener]]s
    * that listen for execution metrics.
    */
-  lazy val listenerManager: ExecutionListenerManager = new ExecutionListenerManager
+  lazy val listenerManager: ExecutionListenerManager =
+    withParent[ExecutionListenerManager]((s: SessionState)
+      => s.listenerManager)(new ExecutionListenerManager)
 
   /**
    * Interface to start and stop [[StreamingQuery]]s.
    */
-  lazy val streamingQueryManager: StreamingQueryManager = {
+  lazy val streamingQueryManager: StreamingQueryManager =
+    withParent[StreamingQueryManager]((s: SessionState)
+      => s.streamingQueryManager)
+  {
     new StreamingQueryManager(sparkSession)
   }
 
   private val jarClassLoader: NonClosableMutableURLClassLoader =
     sparkSession.sharedState.jarClassLoader
-
-  // Automatically extract all entries and put it in our SQLConf
-  // We need to call it after all of vals have been initialized.
-  sparkSession.sparkContext.getConf.getAll.foreach { case (k, v) =>
-    conf.setConfString(k, v)
-  }
 
   // ------------------------------------------------------
   //  Helper methods, partially leftover from pre-2.0 days

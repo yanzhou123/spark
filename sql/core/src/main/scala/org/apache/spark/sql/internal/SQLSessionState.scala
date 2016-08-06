@@ -119,11 +119,6 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
     }
   }
 
-  /**
-   * SQL-specific key-value configurations.
-   */
-  override lazy val conf: SQLConf = currentSessionState.map(_.conf).getOrElse(null)
-
   override def newHadoopConfWithOptions(options: Map[String, String]): Configuration =
     currentSessionState.map(_.newHadoopConfWithOptions(options)).getOrElse(null)
 
@@ -168,6 +163,10 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
    * Parser that extracts expressions, plans, table identifiers etc. from SQL texts.
    */
   override lazy val sqlParser: ParserInterface = new SparkSqlParser(conf)
+
+  // Automatically extract all entries and put it in our SQLConf
+  // We need to call it after all of vals have been initialized.
+  sparkSession.sparkContext.getConf.getAll.foreach { case (k, v) => conf.setConfString(k, v) }
 
   /**
    * Planner that converts optimized logical plans to physical plans.
