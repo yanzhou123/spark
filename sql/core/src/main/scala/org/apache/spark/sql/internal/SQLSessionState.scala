@@ -88,7 +88,7 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
    * are supported for Hive and all other data sources
    */
   lazy val currentSessionState = sparkSession.sparkContext.conf
-    .get(CATALOG_IMPLEMENTATION.key) match {
+    .get(CATALOG_IMPLEMENTATION.key, "in-memory") match {
     case "hive" => val result = sessionStateMap.get("hive").orElse {
         val hiveExternCatalog = reflect[ExternalCatalog, SparkContext](
           HIVE_EXTERNAL_CATALOG_CLASS_NAME, sparkSession.sparkContext
