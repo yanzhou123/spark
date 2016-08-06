@@ -46,7 +46,7 @@ import org.apache.spark.sql.types._
  */
 private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Logging {
   private lazy val sessionState = sparkSession.sessionState.asInstanceOf[SQLSessionState]
-    .currentSessionState.asInstanceOf[HiveSessionState]
+    .currentSessionState.get.asInstanceOf[HiveSessionState]
   private val client = sparkSession.sharedState.externalCatalog.
     asInstanceOf[HiveExternalCatalog].client
 

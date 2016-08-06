@@ -49,7 +49,7 @@ class HiveDDLSuite
       dbPath: Option[String] = None): Boolean = {
     val expectedTablePath =
       if (dbPath.isEmpty) {
-        hiveContext.sessionState.currentSessionState.asInstanceOf[HiveSessionState]
+        hiveContext.sessionState.currentSessionState.get.asInstanceOf[HiveSessionState]
           .catalog.hiveDefaultTableFilePath(tableIdentifier)
       } else {
         new Path(new Path(dbPath.get), tableIdentifier.table).toString

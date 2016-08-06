@@ -40,7 +40,8 @@ class HiveCompatibilitySuite extends HiveQueryFileTest with BeforeAndAfter {
   private val originalLocale = Locale.getDefault
   private val originalColumnBatchSize = TestHive.conf.columnBatchSize
   private val originalInMemoryPartitionPruning = TestHive.conf.inMemoryPartitionPruning
-  private val originalConvertMetastoreOrc = TestHive.sessionState.asInstanceOf[HiveSessionState].convertMetastoreOrc
+  private val originalConvertMetastoreOrc = TestHive.sessionState.currentSessionState.get
+    .asInstanceOf[HiveSessionState].convertMetastoreOrc
   private val originalCrossJoinEnabled = TestHive.conf.crossJoinEnabled
 
   def testCases: Seq[(String, File)] = {

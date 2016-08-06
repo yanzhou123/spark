@@ -82,8 +82,8 @@ class BucketedWriteSuite extends QueryTest with SQLTestUtils with TestHiveSingle
 
   def tableDir: File = {
     val identifier = spark.sessionState.sqlParser.parseTableIdentifier("bucketed_table")
-    new File(URI.create(hiveContext.sessionState.currentSessionState.asInstanceOf[HiveSessionState]
-      .catalog.hiveDefaultTableFilePath(identifier)))
+    new File(URI.create(hiveContext.sessionState.currentSessionState.get
+      .asInstanceOf[HiveSessionState].catalog.hiveDefaultTableFilePath(identifier)))
   }
 
   /**

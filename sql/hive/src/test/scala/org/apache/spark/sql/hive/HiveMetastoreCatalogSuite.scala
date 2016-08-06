@@ -105,7 +105,7 @@ class DataSourceWithHiveMetastoreCatalogSuite
         assert(columns.map(_.dataType) === Seq("decimal(10,3)", "string"))
 
         checkAnswer(table("t"), testDF)
-        assert(sessionState.currentSessionState.asInstanceOf[HiveSessionState].metadataHive
+        assert(sessionState.currentSessionState.get.asInstanceOf[HiveSessionState].metadataHive
           .runSqlHive("SELECT * FROM t") === Seq("1.1\t1", "2.1\t2"))
       }
     }
@@ -139,7 +139,7 @@ class DataSourceWithHiveMetastoreCatalogSuite
           assert(columns.map(_.dataType) === Seq("decimal(10,3)", "string"))
 
           checkAnswer(table("t"), testDF)
-          assert(sessionState.currentSessionState.asInstanceOf[HiveSessionState].metadataHive
+          assert(sessionState.currentSessionState.get.asInstanceOf[HiveSessionState].metadataHive
             .runSqlHive("SELECT * FROM t") ===
             Seq("1.1\t1", "2.1\t2"))
         }
@@ -171,7 +171,7 @@ class DataSourceWithHiveMetastoreCatalogSuite
           assert(columns.map(_.dataType) === Seq("int", "string"))
 
           checkAnswer(table("t"), Row(1, "val_1"))
-          assert(sessionState.currentSessionState.asInstanceOf[HiveSessionState].metadataHive
+          assert(sessionState.currentSessionState.get.asInstanceOf[HiveSessionState].metadataHive
             .runSqlHive("SELECT * FROM t") === Seq("1\tval_1"))
         }
       }
