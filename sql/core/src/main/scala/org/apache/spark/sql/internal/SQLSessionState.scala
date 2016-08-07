@@ -76,8 +76,8 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
   }
 
   // ordered sessions states, currently with in-memory state leading the way
-  private lazy val orderedSessionState = {
-    List(inMemState) ++ sessionStateMap.clone.remove("in-memory").toList
+  private lazy val orderedSessionState: List[SessionState] = {
+    List(inMemState) ++ (sessionStateMap.clone -= "in-memory").values.toList
   }
 
   private val HIVE_EXTERNAL_CATALOG_CLASS_NAME = "org.apache.spark.sql.hive.HiveExternalCatalog"
@@ -122,14 +122,6 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
   override def newHadoopConfWithOptions(options: Map[String, String]): Configuration =
     currentSessionState.map(_.newHadoopConfWithOptions(options)).getOrElse(null)
 
-  override lazy val experimentalMethods: ExperimentalMethods = new ExperimentalMethods {
-    extraStrategies =
-      combine[Strategy]((s: SessionState) => s.experimentalMethods.extraStrategies)
-    extraOptimizations =
-      combine[Rule[LogicalPlan]]((s: SessionState) => s.experimentalMethods.extraOptimizations)
-  }
-
-
   /**
    * Internal catalog for managing table and database states.
    */
@@ -173,7 +165,8 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
    */
   override def planner: SparkPlanner =
     new SparkPlanner(sparkSession.sparkContext, conf, experimentalMethods.extraStrategies) {
-      override def strategies = combine[Strategy]((s: SessionState) => s.planner.strategies)
+      override def strategies = extraStrategies ++ combine[Strategy]((s: SessionState)
+      => s.planner.strategies)
     }
 
   override def refreshTable(tableName: String): Unit = {
