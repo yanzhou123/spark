@@ -39,6 +39,7 @@ import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.execution.{SparkPlan, UnaryExecNode}
 import org.apache.spark.sql.hive._
 import org.apache.spark.sql.hive.HiveShim.{ShimFileSinkDesc => FileSinkDesc}
+import org.apache.spark.sql.internal.SQLSessionState
 import org.apache.spark.SparkException
 import org.apache.spark.util.SerializableJobConf
 
@@ -50,7 +51,9 @@ case class InsertIntoHiveTable(
     overwrite: Boolean,
     ifNotExists: Boolean) extends UnaryExecNode {
 
-  @transient private val sessionState = sqlContext.sessionState.asInstanceOf[HiveSessionState]
+  @transient private val sessionState = sqlContext.sessionState.asInstanceOf[SQLSessionState]
+    .currentSessionState.get.asInstanceOf[HiveSessionState]
+
   @transient private val client = sessionState.metadataHive
 
   def output: Seq[Attribute] = Seq.empty

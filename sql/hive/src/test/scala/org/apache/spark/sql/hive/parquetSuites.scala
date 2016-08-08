@@ -490,7 +490,7 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
     // For insert into non-partitioned table, we will do the conversion,
     // so the converted test_insert_parquet should be cached.
     sessionState.refreshTable("test_insert_parquet")
-    assert(sessionState.currentSessionState.asInstanceOf[HiveSessionState]
+    assert(sessionState.currentSessionState.get.asInstanceOf[HiveSessionState]
       .catalog.getCachedDataSourceTable(tableIdentifier) === null)
     sql(
       """
@@ -504,7 +504,7 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
       sql("select a, b from jt").collect())
     // Invalidate the cache.
     sessionState.refreshTable("test_insert_parquet")
-    assert(sessionState.currentSessionState.asInstanceOf[HiveSessionState]
+    assert(sessionState.currentSessionState.get.asInstanceOf[HiveSessionState]
       .catalog.getCachedDataSourceTable(tableIdentifier) === null)
 
     // Create a partitioned table.
@@ -523,7 +523,7 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
       """.stripMargin)
 
     tableIdentifier = TableIdentifier("test_parquet_partitioned_cache_test", Some("default"))
-    assert(sessionState.currentSessionState.asInstanceOf[HiveSessionState]
+    assert(sessionState.currentSessionState.get.asInstanceOf[HiveSessionState]
         .catalog.getCachedDataSourceTable(tableIdentifier) === null)
     sql(
       """
@@ -533,7 +533,7 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
       """.stripMargin)
     // Right now, insert into a partitioned Parquet is not supported in data source Parquet.
     // So, we expect it is not cached.
-    assert(sessionState.currentSessionState.asInstanceOf[HiveSessionState]
+    assert(sessionState.currentSessionState.get.asInstanceOf[HiveSessionState]
         .catalog.getCachedDataSourceTable(tableIdentifier) === null)
     sql(
       """
@@ -541,7 +541,7 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
         |PARTITION (`date`='2015-04-02')
         |select a, b from jt
       """.stripMargin)
-    assert(sessionState.currentSessionState.asInstanceOf[HiveSessionState]
+    assert(sessionState.currentSessionState.get.asInstanceOf[HiveSessionState]
         .catalog.getCachedDataSourceTable(tableIdentifier) === null)
 
     // Make sure we can cache the partitioned table.
@@ -558,7 +558,7 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
         """.stripMargin).collect())
 
     sessionState.refreshTable("test_parquet_partitioned_cache_test")
-    assert(sessionState.currentSessionState.asInstanceOf[HiveSessionState]
+    assert(sessionState.currentSessionState.get.asInstanceOf[HiveSessionState]
         .catalog.getCachedDataSourceTable(tableIdentifier) === null)
 
     dropTables("test_insert_parquet", "test_parquet_partitioned_cache_test")

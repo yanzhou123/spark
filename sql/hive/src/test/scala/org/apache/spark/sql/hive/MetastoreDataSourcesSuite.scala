@@ -372,7 +372,7 @@ class MetastoreDataSourcesSuite extends QueryTest with SQLTestUtils with TestHiv
          """.stripMargin)
 
       val expectedPath =
-        sessionState.currentSessionState.asInstanceOf[HiveSessionState]
+        sessionState.currentSessionState.get.asInstanceOf[HiveSessionState]
           .catalog.hiveDefaultTableFilePath(TableIdentifier("ctasJsonTable"))
       val filesystemPath = new Path(expectedPath)
       val fs = filesystemPath.getFileSystem(spark.sessionState.newHadoopConf())
@@ -465,7 +465,7 @@ class MetastoreDataSourcesSuite extends QueryTest with SQLTestUtils with TestHiv
           sql("DROP TABLE savedJsonTable")
           intercept[AnalysisException] {
             read.json(
-              sessionState.currentSessionState.asInstanceOf[HiveSessionState]
+              sessionState.currentSessionState.get.asInstanceOf[HiveSessionState]
                 .catalog.hiveDefaultTableFilePath(TableIdentifier("savedJsonTable")))
           }
         }
@@ -736,7 +736,7 @@ class MetastoreDataSourcesSuite extends QueryTest with SQLTestUtils with TestHiv
           serde = None,
           compressed = false,
           serdeProperties = Map(
-            "path" -> sessionState.currentSessionState.asInstanceOf[HiveSessionState]
+            "path" -> sessionState.currentSessionState.get.asInstanceOf[HiveSessionState]
               .catalog.hiveDefaultTableFilePath(TableIdentifier(tableName)))
         ),
         properties = Map(

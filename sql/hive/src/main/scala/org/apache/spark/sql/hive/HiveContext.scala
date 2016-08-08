@@ -21,6 +21,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SQLContext}
+import org.apache.spark.sql.internal.SQLSessionState
 
 
 /**
@@ -49,7 +50,8 @@ class HiveContext private[hive](_sparkSession: SparkSession)
   }
 
   protected[sql] override def sessionState: HiveSessionState = {
-    sparkSession.sessionState.asInstanceOf[HiveSessionState]
+    sparkSession.sessionState.asInstanceOf[SQLSessionState].currentSessionState
+      .get.asInstanceOf[HiveSessionState]
   }
 
   /**
