@@ -515,7 +515,8 @@ private[hive] class TestHiveSharedState(
     scratchDirPath: File,
     metastoreTemporaryConf: Map[String, String])
   extends SharedState(sc) {
-  externalCatalog = new HiveExternalCatalog(sc)
+  externalCatalog = new HiveExternalCatalog(sc, TestHiveContext.newClientForMetadata(
+    sc.conf, sc.hadoopConfiguration, warehousePath, scratchDirPath, metastoreTemporaryConf))
 }
 
 

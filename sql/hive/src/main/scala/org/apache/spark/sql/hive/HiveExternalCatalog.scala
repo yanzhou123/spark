@@ -48,6 +48,11 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
     testConf = Some(conf)
   }
 
+  def this(sparkContext: SparkContext, hiveClient: HiveClient) = {
+    this(sparkContext)
+    testClient = Some(hiveClient)
+  }
+
   import CatalogTypes.TablePartitionSpec
 
   // Exceptions thrown by the hive client that we would like to wrap
