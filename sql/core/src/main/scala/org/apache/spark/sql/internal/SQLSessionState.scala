@@ -71,12 +71,21 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
   }
 
   // combine children rules
-  private def combine[T](s: SessionState => Seq[T]): Seq[T] = {
-    orderedSessionState.map(s(_)).reduceLeft(_ ++ _)
+  private def combine[T](sss: List[SessionState], s: SessionState => Seq[T]): Seq[T] = {
+    sss.map(s(_)).reduceLeft(_ ++ _)
   }
 
-  // ordered sessions states, currently with in-memory state leading the way
-  private lazy val orderedSessionState: List[SessionState] = {
+  // ordered sessions states, with trailing in-memory session state
+  // Used for planer composition where the data source specific
+  // rules leading the default, in-memory rules
+  private lazy val InMemoryLastSessionStates: List[SessionState] = {
+    (sessionStateMap.clone -= "in-memory").values.toList ++ List(inMemState)
+  }
+
+  // ordered sessions states, with leading in-memory session state
+  // Used for analyzer composition where the data source specific
+  // rules leading the default, in-memory rules
+  private lazy val InMemoryFirstSessionStates: List[SessionState] = {
     List(inMemState) ++ (sessionStateMap.clone -= "in-memory").values.toList
   }
 
@@ -137,10 +146,12 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
   override lazy val analyzer: Analyzer = {
     new Analyzer(catalog, conf) {
       override val extendedResolutionRules =
-        combine[Rule[LogicalPlan]]((s: SessionState) => s.analyzer.extendedResolutionRules)
+        combine[Rule[LogicalPlan]](InMemoryFirstSessionStates,
+          (s: SessionState) => s.analyzer.extendedResolutionRules)
 
       override val extendedCheckRules =
-        combine[LogicalPlan => Unit]((s: SessionState) => s.analyzer.extendedCheckRules)
+        combine[LogicalPlan => Unit](InMemoryFirstSessionStates,
+          (s: SessionState) => s.analyzer.extendedCheckRules)
     }
   }
 
@@ -151,7 +162,7 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
    */
     /*
   override lazy val optimizer: Optimizer = new Optimizer(catalog, conf) {
-    override def batches = orderedSessionState.map(_.optimizer.batches).reduceLeft(_ ++ _)
+    override def batches = InMemoryLastSessionStates.map(_.optimizer.batches).reduceLeft(_ ++ _)
   }
   */
 
@@ -169,8 +180,8 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
    */
   override def planner: SparkPlanner =
     new SparkPlanner(sparkSession.sparkContext, conf, experimentalMethods.extraStrategies) {
-      override def strategies = extraStrategies ++ combine[Strategy]((s: SessionState)
-      => s.planner.strategies)
+      override def strategies = extraStrategies ++ combine[Strategy](
+        InMemoryLastSessionStates, (s: SessionState) => s.planner.strategies)
     }
 
   override def refreshTable(tableName: String): Unit = {
