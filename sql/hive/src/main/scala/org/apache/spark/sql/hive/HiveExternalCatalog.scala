@@ -55,6 +55,8 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
 
   import CatalogTypes.TablePartitionSpec
 
+  override val name = "hive"
+
   // Exceptions thrown by the hive client that we would like to wrap
   private val clientExceptions = Set(
     classOf[HiveException].getCanonicalName,

@@ -34,6 +34,8 @@ import org.apache.spark.sql.catalyst.analysis.NoSuchDatabaseException
 abstract class ExternalCatalog {
   import CatalogTypes.TablePartitionSpec
 
+  val name: String
+
   protected def requireDbExists(db: String): Unit = {
     if (!databaseExists(db)) {
       throw new NoSuchDatabaseException(db)

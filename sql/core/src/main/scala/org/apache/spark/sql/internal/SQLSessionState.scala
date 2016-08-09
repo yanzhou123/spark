@@ -99,14 +99,20 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
   lazy val currentSessionState = sparkSession.sparkContext.conf
     .get(CATALOG_IMPLEMENTATION.key, "in-memory") match {
     case "hive" => val result = sessionStateMap.get("hive").orElse {
-        val hiveExternCatalog = reflect[ExternalCatalog, SparkContext](
-          HIVE_EXTERNAL_CATALOG_CLASS_NAME, sparkSession.sparkContext
-        )
-        sparkSession.sharedState.externalCatalog = hiveExternCatalog
+        val hiveExternCatalog =
+          if (!sparkSession.sharedState.externalCatalog.name.equals("hive"))
+          {
+            reflect[ExternalCatalog, SparkContext](
+              HIVE_EXTERNAL_CATALOG_CLASS_NAME, sparkSession.sparkContext
+            )
+          } else {
+            sparkSession.sharedState.externalCatalog
+          }
         val hiveSessionState = reflect[SessionState, SparkSession](
           HIVE_SESSION_STATE_CLASS_NAME, sparkSession)
         sessionStateMap.put("hive", hiveSessionState)
-        Some(hiveSessionState)}
+        Some(hiveSessionState)
+    }
       sparkSession.sharedState.externalCatalog = result.get.catalog.externalCatalog
       result
     case _ => Some(inMemState)

@@ -42,6 +42,8 @@ import org.apache.spark.sql.catalyst.util.StringUtils
 class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends ExternalCatalog {
   import CatalogTypes.TablePartitionSpec
 
+  override val name = "in-memory"
+
   private class TableDesc(var table: CatalogTable) {
     val partitions = new mutable.HashMap[TablePartitionSpec, CatalogTablePartition]
   }
