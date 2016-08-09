@@ -905,7 +905,9 @@ object SparkSession {
   /** Reference to the root SparkSession. */
   private val defaultSession = new AtomicReference[SparkSession]
 
-  private val HIVE_SHARED_STATE_CLASS_NAME = "org.apache.spark.sql.hive.HiveSharedState"
+  // TODO: Identical to the two defined in SQLSessionState;
+  // to be consolidated/moved/removed
+  private val HIVE_EXTERNAL_CATALOG_CLASS_NAME = "org.apache.spark.sql.hive.HiveExternalCatalog"
   private val HIVE_SESSION_STATE_CLASS_NAME = "org.apache.spark.sql.hive.HiveSessionState"
 
   /**
@@ -913,8 +915,8 @@ object SparkSession {
    */
   private[spark] def hiveClassesArePresent: Boolean = {
     try {
+      Utils.classForName(HIVE_EXTERNAL_CATALOG_CLASS_NAME)
       Utils.classForName(HIVE_SESSION_STATE_CLASS_NAME)
-      Utils.classForName(HIVE_SHARED_STATE_CLASS_NAME)
       Utils.classForName("org.apache.hadoop.hive.conf.HiveConf")
       true
     } catch {

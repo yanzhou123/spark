@@ -111,6 +111,7 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
         val hiveSessionState = reflect[SessionState, SparkSession](
           HIVE_SESSION_STATE_CLASS_NAME, sparkSession)
         sessionStateMap.put("hive", hiveSessionState)
+        sparkSession.sharedState.externalCatalog = hiveExternCatalog
         Some(hiveSessionState)
     }
       sparkSession.sharedState.externalCatalog = result.get.catalog.externalCatalog
