@@ -127,6 +127,10 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
    */
   override lazy val catalog = currentSessionState.map(_.catalog).getOrElse(null)
 
+  override def addJar(path: String): Unit = {
+    currentSessionState.get.addJar(path)
+  }
+
   /**
    * Logical query plan analyzer for resolving unresolved attributes and relations.
    */
