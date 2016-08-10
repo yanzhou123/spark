@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.catalyst
 
-
 /**
  * An identifier that optionally specifies a database.
  *
@@ -27,14 +26,27 @@ package org.apache.spark.sql.catalyst
 sealed trait IdentifierWithDatabase {
   val identifier: String
 
+  def dataSource: Option[String]
   def database: Option[String]
 
   def quotedString: String = {
-    if (database.isDefined) s"`${database.get}`.`$identifier`" else s"`$identifier`"
+    if (dataSource.isDefined) {
+        s"`${database.get}`.`${database.get}`.`$identifier`"
+    } else if (database.isDefined) {
+      s"`${database.get}`.`$identifier`"
+    } else {
+      s"`$identifier`"
+    }
   }
 
   def unquotedString: String = {
-    if (database.isDefined) s"${database.get}.$identifier" else identifier
+    if (dataSource.isDefined) {
+      s"${database.get}.${database.get}.$identifier"
+    } else if (database.isDefined) {
+      s"${database.get}.$identifier"
+    } else {
+      s"$identifier"
+    }
   }
 
   override def toString: String = quotedString
@@ -47,12 +59,15 @@ sealed trait IdentifierWithDatabase {
  * When we register a permanent function in the FunctionRegistry, we use
  * unquotedString as the function name.
  */
-case class TableIdentifier(table: String, database: Option[String])
+case class TableIdentifier(
+    table: String,
+    database: Option[String],
+    dataSource: Option[String] = None)
   extends IdentifierWithDatabase {
 
   override val identifier: String = table
 
-  def this(table: String) = this(table, None)
+  def this(table: String) = this(table, None, None)
 
 }
 
@@ -65,7 +80,10 @@ object TableIdentifier {
  * Identifies a function in a database.
  * If `database` is not defined, the current database is used.
  */
-case class FunctionIdentifier(funcName: String, database: Option[String])
+case class FunctionIdentifier(
+    funcName: String,
+    database: Option[String],
+    dataSource: Option[String] = None)
   extends IdentifierWithDatabase {
 
   override val identifier: String = funcName
