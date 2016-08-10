@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.analysis.{Analyzer, FunctionRegistry}
 import org.apache.spark.sql.catalyst.catalog.{ArchiveResource, _}
-import org.apache.spark.sql.catalyst.optimizer.Optimizer
+import org.apache.spark.sql.catalyst.optimizer.{GetCurrentDatabase, Optimizer}
 import org.apache.spark.sql.catalyst.parser.ParserInterface
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution._
@@ -122,7 +122,13 @@ private[sql] abstract class SessionState(sparkSession: SparkSession) {
   /**
    * Logical query plan optimizer.
    */
-  lazy val optimizer: Optimizer = new SparkOptimizer(catalog, conf, experimentalMethods)
+  lazy val optimizer: Optimizer = new SparkOptimizer(catalog, conf, experimentalMethods) {
+    override def batches: Seq[Batch] =
+      // Need to add GetCurrentDatabase here since it is session-dependent
+      Batch("Finish Analysis", Once, GetCurrentDatabase(catalog)) ::
+        Batch("User Provided Optimizers", fixedPoint,
+          experimentalMethods.extraOptimizations: _*) :: Nil
+  }
 
   /**
    * Parser that extracts expressions, plans, table identifiers etc. from SQL texts.

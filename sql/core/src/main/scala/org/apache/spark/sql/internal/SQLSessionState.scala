@@ -28,6 +28,7 @@ import org.apache.spark.internal.config.CATALOG_IMPLEMENTATION
 import org.apache.spark.sql.{Strategy, _}
 import org.apache.spark.sql.catalyst.analysis.Analyzer
 import org.apache.spark.sql.catalyst.catalog.ExternalCatalog
+import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.parser.ParserInterface
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -59,11 +60,14 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
       }
     }
 
+    override lazy val optimizer: Optimizer = new SparkOptimizer(catalog, conf, experimentalMethods)
+
     override def planner: SparkPlanner =
       new SparkPlanner(sparkSession.sparkContext, conf, experimentalMethods.extraStrategies)
 
   }
 
+  // TODO: use Guava Cache??
   private lazy val sessionStateMap = {
     val result = new mutable.HashMap[String, SessionState]()
     result.put("in-memory", inMemState)
@@ -163,15 +167,17 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
   }
 
   /**
-   * Logical query plan optimizer. Can't make it composable now
-    * due to the nested type of Batch per Optimizer instance which
-    * makes the concatenation of batches impossible.
+   * Logical query plan optimizer
    */
-    /*
-  override lazy val optimizer: Optimizer = new Optimizer(catalog, conf) {
-    override def batches = InMemoryLastSessionStates.map(_.optimizer.batches).reduceLeft(_ ++ _)
+  override lazy val optimizer: Optimizer = new SparkOptimizer(catalog, conf, experimentalMethods) {
+    override def batches: Seq[Batch] = Batch("User Provided Optimizers", fixedPoint
+      , experimentalMethods.extraOptimizations: _*) :: Nil
+
+    override def execute(plan: LogicalPlan): LogicalPlan =
+      super.execute(InMemoryLastSessionStates.foldLeft(plan) {
+        (p, x) => x.optimizer.execute(p)
+      })
   }
-  */
 
   /**
    * Parser that extracts expressions, plans, table identifiers etc. from SQL texts.
