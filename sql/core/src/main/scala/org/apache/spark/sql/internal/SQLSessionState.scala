@@ -94,7 +94,6 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
   }
 
   private val HIVE_EXTERNAL_CATALOG_CLASS_NAME = "org.apache.spark.sql.hive.HiveExternalCatalog"
-  private val HIVE_SESSION_STATE_CLASS_NAME = "org.apache.spark.sql.hive.HiveSessionState"
 
   /**
    * current active session state: will be made val on in-memory once data source functionalities
@@ -112,8 +111,8 @@ private[sql] class SQLSessionState(sparkSession: SparkSession) extends SessionSt
           } else {
             sparkSession.sharedState.externalCatalog
           }
-        val hiveSessionState = reflect[SessionState, SparkSession](
-          HIVE_SESSION_STATE_CLASS_NAME, sparkSession)
+        val hiveSessionState = hiveExternCatalog.getSessionState(sparkSession)
+            .asInstanceOf[SessionState]
         sessionStateMap.put("hive", hiveSessionState)
         sparkSession.sharedState.externalCatalog = hiveExternCatalog
         Some(hiveSessionState)
