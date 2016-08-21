@@ -26,7 +26,7 @@ import org.apache.spark.internal.config._
 import org.apache.spark.sql.{AnalysisException, QueryTest, Row, SaveMode}
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, CatalogTableType}
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.hive.HiveSessionState
+import org.apache.spark.sql.hive.HiveSessionCatalog
 import org.apache.spark.sql.hive.test.TestHiveSingleton
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SQLTestUtils
@@ -49,8 +49,8 @@ class HiveDDLSuite
       dbPath: Option[String] = None): Boolean = {
     val expectedTablePath =
       if (dbPath.isEmpty) {
-        hiveContext.sessionState.currentSessionState.get.asInstanceOf[HiveSessionState]
-          .catalog.hiveDefaultTableFilePath(tableIdentifier)
+        hiveContext.sessionState.catalog.getDataSourceSessionCatalog("hive")
+          .asInstanceOf[HiveSessionCatalog].hiveDefaultTableFilePath(tableIdentifier)
       } else {
         new Path(new Path(dbPath.get), tableIdentifier.table).toString
       }

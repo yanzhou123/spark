@@ -40,10 +40,10 @@ class NoSuchPartitionException(
 class NoSuchPermanentFunctionException(db: String, func: String)
   extends AnalysisException(s"Function '$func' not found in database '$db'")
 
-class NoSuchFunctionException(db: String, func: String)
+class NoSuchFunctionException(datasource: String, db: String, func: String)
   extends AnalysisException(
     s"Undefined function: '$func'. This function is neither a registered temporary function nor " +
-    s"a permanent function registered in the database '$db'.")
+    s"a permanent function registered in the database '$datasource'.'$db'.")
 
 class NoSuchPartitionsException(db: String, table: String, specs: Seq[TablePartitionSpec])
   extends AnalysisException(
@@ -52,3 +52,9 @@ class NoSuchPartitionsException(db: String, table: String, specs: Seq[TableParti
 
 class NoSuchTempFunctionException(func: String)
   extends AnalysisException(s"Temporary function '$func' not found")
+
+class NoSuchDataSourceException(dataSource: String)
+  extends AnalysisException(s"Data Source '$dataSource' not found in internal catalog")
+
+class NoSuchSessionCatalogException(dataSource: String)
+  extends AnalysisException(s"A SessionCatalog for '$dataSource' not found in internal catalog")

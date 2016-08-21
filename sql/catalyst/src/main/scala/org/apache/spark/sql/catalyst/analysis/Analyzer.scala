@@ -22,7 +22,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.{CatalystConf, ScalaReflection, SimpleCatalystConf}
-import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, CatalogRelation, InMemoryCatalog, SessionCatalog}
+import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.catalyst.encoders.OuterScopes
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
@@ -43,7 +43,7 @@ import org.apache.spark.sql.types._
  */
 object SimpleAnalyzer extends Analyzer(
     new SessionCatalog(
-      new InMemoryCatalog,
+      new InternalCatalog(new InMemoryCatalog),
       EmptyFunctionRegistry,
       new SimpleCatalystConf(caseSensitiveAnalysis = true)) {
       override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean) {}
@@ -443,7 +443,7 @@ class Analyzer(
   object ResolveRelations extends Rule[LogicalPlan] {
     private def lookupTableFromCatalog(u: UnresolvedRelation): LogicalPlan = {
       try {
-        catalog.lookupRelation(u.tableIdentifier, u.alias)
+          catalog.lookupRelation(u.tableIdentifier, u.alias)
       } catch {
         case _: NoSuchTableException =>
           u.failAnalysis(s"Table or view not found: ${u.tableName}")

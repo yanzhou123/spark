@@ -19,7 +19,7 @@ package org.apache.spark.sql.catalyst.analysis
 
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.SimpleCatalystConf
-import org.apache.spark.sql.catalyst.catalog.{InMemoryCatalog, SessionCatalog}
+import org.apache.spark.sql.catalyst.catalog.{InMemoryCatalog, InternalCatalog, SessionCatalog}
 import org.apache.spark.sql.catalyst.plans.PlanTest
 import org.apache.spark.sql.catalyst.plans.logical._
 
@@ -30,7 +30,8 @@ trait AnalysisTest extends PlanTest {
 
   private def makeAnalyzer(caseSensitive: Boolean): Analyzer = {
     val conf = new SimpleCatalystConf(caseSensitive)
-    val catalog = new SessionCatalog(new InMemoryCatalog, EmptyFunctionRegistry, conf)
+    val catalog = new SessionCatalog(new InternalCatalog(new InMemoryCatalog),
+      EmptyFunctionRegistry, conf)
     catalog.createTempView("TaBlE", TestRelations.testRelation, overrideIfExists = true)
     new Analyzer(catalog, conf) {
       override val extendedResolutionRules = EliminateSubqueryAliases :: Nil

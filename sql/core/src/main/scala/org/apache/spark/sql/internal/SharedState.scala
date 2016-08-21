@@ -20,7 +20,7 @@ package org.apache.spark.sql.internal
 import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SQLContext}
-import org.apache.spark.sql.catalyst.catalog.{ExternalCatalog, InMemoryCatalog}
+import org.apache.spark.sql.catalyst.catalog.InternalCatalog
 import org.apache.spark.sql.execution.CacheManager
 import org.apache.spark.sql.execution.ui.{SQLListener, SQLTab}
 import org.apache.spark.util.{MutableURLClassLoader, Utils}
@@ -51,7 +51,7 @@ private[sql] class SharedState(val sparkContext: SparkContext) extends Logging {
   /**
    * A catalog that interacts with external systems.
    */
-  var externalCatalog: ExternalCatalog = new InMemoryCatalog(sparkContext.hadoopConfiguration)
+  val internalCatalog: InternalCatalog = new InternalCatalog
 
   /**
    * A classloader used to load all user-added jar.

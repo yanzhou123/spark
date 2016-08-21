@@ -17,8 +17,9 @@
 
 package org.apache.spark.sql.catalyst.catalog
 
-import org.apache.spark.sql.catalyst.analysis.NoSuchDatabaseException
+import scala.collection.mutable
 
+import org.apache.spark.sql.catalyst.analysis.NoSuchDatabaseException
 
 /**
  * Interface for the system catalog (of columns, partitions, tables, and databases).
@@ -36,6 +37,8 @@ abstract class ExternalCatalog {
 
   val name: String
 
+  val properties = new mutable.HashMap[String, String]
+
   protected def requireDbExists(db: String): Unit = {
     if (!databaseExists(db)) {
       throw new NoSuchDatabaseException(db)
@@ -51,10 +54,7 @@ abstract class ExternalCatalog {
    * @return SessionState
    */
 
-  def getSessionState(sparkSession: Any): Any = {
-    throw new UnsupportedOperationException("getSessionState not supported for class "
-      + this.getClass.getName)
-  }
+  def getSessionCatalog(sparkSession: Any): DataSourceSessionCatalog
 
   // --------------------------------------------------------------------------
   // Databases
@@ -200,4 +200,8 @@ abstract class ExternalCatalog {
 
   def listFunctions(db: String, pattern: String): Seq[String]
 
+  def setProperties(properties: Map[String, String]): ExternalCatalog = {
+    properties.foreach(p => this.properties.put(p._1, p._2))
+    this
+  }
 }

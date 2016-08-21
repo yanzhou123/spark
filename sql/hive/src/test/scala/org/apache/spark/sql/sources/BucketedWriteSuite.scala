@@ -26,7 +26,7 @@ import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.plans.physical.HashPartitioning
 import org.apache.spark.sql.execution.datasources.BucketingUtils
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.hive.HiveSessionState
+import org.apache.spark.sql.hive.HiveSessionCatalog
 import org.apache.spark.sql.hive.test.TestHiveSingleton
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SQLTestUtils
@@ -82,8 +82,8 @@ class BucketedWriteSuite extends QueryTest with SQLTestUtils with TestHiveSingle
 
   def tableDir: File = {
     val identifier = spark.sessionState.sqlParser.parseTableIdentifier("bucketed_table")
-    new File(URI.create(hiveContext.sessionState.currentSessionState.get
-      .asInstanceOf[HiveSessionState].catalog.hiveDefaultTableFilePath(identifier)))
+    new File(URI.create(hiveContext.sessionState.catalog.getDataSourceSessionCatalog("hive")
+        .asInstanceOf[HiveSessionCatalog].hiveDefaultTableFilePath(identifier)))
   }
 
   /**

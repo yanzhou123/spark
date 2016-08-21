@@ -27,7 +27,7 @@ import org.apache.hive.service.cli.session.HiveSession
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.hive.HiveSessionState
+import org.apache.spark.sql.hive.HiveSessionCatalog
 import org.apache.spark.sql.hive.thriftserver.{ReflectionUtils, SparkExecuteStatementOperation}
 
 /**
@@ -48,8 +48,9 @@ private[thriftserver] class SparkSQLOperationManager()
       confOverlay: JMap[String, String],
       async: Boolean): ExecuteStatementOperation = synchronized {
     val sqlContext = sessionToContexts(parentSession.getSessionHandle)
-    val sessionState = sqlContext.sessionState.asInstanceOf[HiveSessionState]
-    val runInBackground = async && sessionState.hiveThriftServerAsync
+    val sessionCatalog = sqlContext.sessionState.catalog.getDataSourceSessionCatalog("hive")
+      .asInstanceOf[HiveSessionCatalog]
+    val runInBackground = async && sessionCatalog.hiveThriftServerAsync
     val operation = new SparkExecuteStatementOperation(parentSession, statement, confOverlay,
       runInBackground)(sqlContext, sessionToActivePool)
     handleToOperation.put(operation.getHandle, operation)

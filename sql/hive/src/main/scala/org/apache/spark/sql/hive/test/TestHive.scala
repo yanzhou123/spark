@@ -41,7 +41,7 @@ import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.execution.command.CacheTableCommand
 import org.apache.spark.sql.hive._
 import org.apache.spark.sql.hive.client.HiveClient
-import org.apache.spark.sql.internal.{SharedState, SQLConf, SQLSessionState}
+import org.apache.spark.sql.internal.{SessionState, SharedState, SQLConf}
 import org.apache.spark.util.{ShutdownHookManager, Utils}
 
 // SPARK-3729: Test key required to check for initialization errors with config.
@@ -430,7 +430,9 @@ private[hive] class TestHiveSparkSession(
       sessionState.catalog.clearTempTables()
       sessionState.catalog.asInstanceOf[HiveSessionCatalog].invalidateCache()
 
-      sessionState.currentSessionState.get.asInstanceOf[HiveSessionState].metadataHive.reset()
+      val client = sessionState.catalog.getDataSourceSessionCatalog("hive")
+        .asInstanceOf[HiveSessionCatalog].client
+      client.reset()
 
       FunctionRegistry.getFunctionNames.asScala.filterNot(originalUDFs.contains(_)).
         foreach { udfName => FunctionRegistry.unregisterTemporaryUDF(udfName) }
@@ -439,7 +441,6 @@ private[hive] class TestHiveSparkSession(
       sessionState.conf.setConfString("fs.default.name", new File(".").toURI.toString)
       // It is important that we RESET first as broken hooks that might have been set could break
       // other sql exec here.
-      val client = sessionState.currentSessionState.get.asInstanceOf[HiveSessionState].metadataHive
 
       client.runSqlHive("RESET")
       // For some reason, RESET does not reset the following variables...
@@ -515,15 +516,16 @@ private[hive] class TestHiveSharedState(
     scratchDirPath: File,
     metastoreTemporaryConf: Map[String, String])
   extends SharedState(sc) {
-  externalCatalog = new HiveExternalCatalog(sc, TestHiveContext.newClientForMetadata(
-    sc.conf, sc.hadoopConfiguration, warehousePath, scratchDirPath, metastoreTemporaryConf))
+  internalCatalog.registerDataSource("hive",
+    new HiveExternalCatalog(sc, TestHiveContext.newClientForMetadata(
+    sc.conf, sc.hadoopConfiguration, warehousePath, scratchDirPath, metastoreTemporaryConf)))
 }
 
 
 private[hive] class TestHiveSessionState(
     sparkSession: TestHiveSparkSession,
     warehousePath: File)
-  extends SQLSessionState(sparkSession) { self =>
+  extends SessionState(sparkSession) { self =>
 
   override lazy val conf: SQLConf = {
     new SQLConf {

@@ -63,7 +63,7 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
 
   private def requireFunctionExists(db: String, funcName: String): Unit = {
     if (!functionExists(db, funcName)) {
-      throw new NoSuchFunctionException(db = db, func = funcName)
+      throw new NoSuchFunctionException(name, db = db, func = funcName)
     }
   }
 
@@ -105,6 +105,11 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
         throw new PartitionAlreadyExistsException(db = db, table = table, spec = s)
       }
     }
+  }
+
+  def getSessionCatalog(sparkSession: Any): DataSourceSessionCatalog = {
+    // In memory session catalog is to be prebuilt
+    throw new UnsupportedOperationException
   }
 
   // --------------------------------------------------------------------------

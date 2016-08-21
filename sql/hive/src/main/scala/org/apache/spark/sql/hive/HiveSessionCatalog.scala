@@ -25,14 +25,16 @@ import org.apache.hadoop.hive.ql.exec.{UDAF, UDF}
 import org.apache.hadoop.hive.ql.exec.{FunctionRegistry => HiveFunctionRegistry}
 import org.apache.hadoop.hive.ql.udf.generic.{AbstractGenericUDAFResolver, GenericUDF, GenericUDTF}
 
-import org.apache.spark.sql.{AnalysisException, SparkSession}
+import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
-import org.apache.spark.sql.catalyst.analysis.FunctionRegistry
+import org.apache.spark.sql.catalyst.analysis.{Analyzer, FunctionRegistry}
 import org.apache.spark.sql.catalyst.analysis.FunctionRegistry.FunctionBuilder
-import org.apache.spark.sql.catalyst.catalog.{FunctionResourceLoader, SessionCatalog}
+import org.apache.spark.sql.catalyst.catalog.{DataSourceSessionCatalog, FunctionResourceLoader, SessionCatalog}
 import org.apache.spark.sql.catalyst.expressions.{Cast, Expression, ExpressionInfo}
+import org.apache.spark.sql.catalyst.optimizer.{GetCurrentDatabase, Optimizer}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias}
 import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.execution.{SparkOptimizer, SparkPlanner}
 import org.apache.spark.sql.hive.HiveShim.HiveFunctionWrapper
 import org.apache.spark.sql.hive.client.HiveClient
 import org.apache.spark.sql.internal.SQLConf
@@ -42,18 +44,22 @@ import org.apache.spark.util.Utils
 
 private[sql] class HiveSessionCatalog(
     externalCatalog: HiveExternalCatalog,
-    client: HiveClient,
+    private[hive] val client: HiveClient,
     sparkSession: SparkSession,
     functionResourceLoader: FunctionResourceLoader,
     functionRegistry: FunctionRegistry,
     conf: SQLConf,
     hadoopConf: Configuration)
-  extends SessionCatalog(
+  extends DataSourceSessionCatalog(
+    sparkSession,
     externalCatalog,
     functionResourceLoader,
     functionRegistry,
     conf,
-    hadoopConf) {
+    hadoopConf,
+    sparkSession.sessionState.catalog.tempTables) {
+
+  self =>
 
   override def setCurrentDatabase(db: String): Unit = {
     super.setCurrentDatabase(db)
@@ -224,6 +230,10 @@ private[sql] class HiveSessionCatalog(
     }
   }
 
+  override def addJar(path: String): Unit = {
+    client.addJar(path)
+  }
+
   /** List of functions we pass over to Hive. Note that over time this list should go to 0. */
   // We have a list of Hive built-in functions that we do not support. So, we will check
   // Hive's function registry and lazily load needed functions into our own function registry.
@@ -240,4 +250,60 @@ private[sql] class HiveSessionCatalog(
     "percentile",
     "percentile_approx"
   )
+
+  // When true, enables an experimental feature where metastore tables that use the parquet SerDe
+  // are automatically converted to use the Spark SQL parquet table scan, instead of the HiveSerDe.
+  def convertMetastoreParquet: Boolean = {
+    conf.getConf(HiveUtils.CONVERT_METASTORE_PARQUET)
+  }
+
+  // When true, also tries to merge possibly different but compatible Parquet schemas in different
+  // Parquet data files.
+  //
+  // This configuration is only effective when "spark.sql.hive.convertMetastoreParquet" is true.
+  def convertMetastoreParquetWithSchemaMerging: Boolean = {
+    conf.getConf(HiveUtils.CONVERT_METASTORE_PARQUET_WITH_SCHEMA_MERGING)
+  }
+
+  // When true, enables an experimental feature where metastore tables that use the Orc SerDe
+  // are automatically converted to use the Spark SQL ORC table scan, instead of the Hive
+  // SerDe.
+  def convertMetastoreOrc: Boolean = {
+    conf.getConf(HiveUtils.CONVERT_METASTORE_ORC)
+  }
+
+  // When true, Hive Thrift server will execute SQL queries asynchronously using a thread pool."
+  def hiveThriftServerAsync: Boolean = {
+    conf.getConf(HiveUtils.HIVE_THRIFT_SERVER_ASYNC)
+  }
+
+  // TODO: why do we get this from SparkConf but not SQLConf?
+  def hiveThriftServerSingleSession: Boolean = {
+    sparkSession.sparkContext.conf.getBoolean(
+      "spark.sql.hive.thriftServer.singleSession", defaultValue = false)
+  }
+
+  lazy val analyzer: Analyzer = {
+    new Analyzer(sparkSession.sessionState.catalog, conf) {
+      override val extendedResolutionRules =
+        ParquetConversions :: OrcConversions :: CreateTables :: Nil
+    }
+  }
+
+  lazy val optimizer: Optimizer = new SparkOptimizer(sparkSession.sessionState.catalog,
+    conf, new ExperimentalMethods) {
+    override def batches: Seq[Batch] = Nil
+  }
+
+  def planner: SparkPlanner =
+    new SparkPlanner(sparkSession.sparkContext, conf, Nil) with HiveStrategies {
+      override val sparkSession: SparkSession = self.sparkSession
+      override def strategies: Seq[Strategy] = {
+        Seq(
+          HiveTableScans,
+          DataSinks,
+          Scripts
+        )
+      }
+  }
 }

@@ -72,8 +72,12 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
 
   def sessionClient: HiveClient = client.newSession()
 
-  override def getSessionState(sparkSession: Any): Any
-    = new HiveSessionState(sparkSession.asInstanceOf[SparkSession])
+  override def getSessionCatalog(sparkSession: Any): DataSourceSessionCatalog = {
+    val session = sparkSession.asInstanceOf[SparkSession]
+    val sessionState = session.sessionState
+    new HiveSessionCatalog(this, sessionClient, session, sessionState.functionResourceLoader,
+      sessionState.functionRegistry, sessionState.conf, sessionState.catalog.hadoopConf)
+  }
 
   /**
    * Whether this is an exception thrown by the hive client that should be wrapped.

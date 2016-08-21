@@ -22,15 +22,17 @@ import java.io.File
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.sql._
+import org.apache.spark.internal.config._
+import org.apache.spark.sql.{Strategy, _}
 import org.apache.spark.sql.catalyst.analysis.{Analyzer, FunctionRegistry}
-import org.apache.spark.sql.catalyst.catalog.{ArchiveResource, _}
-import org.apache.spark.sql.catalyst.optimizer.{GetCurrentDatabase, Optimizer}
+import org.apache.spark.sql.catalyst.catalog._
+import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.parser.ParserInterface
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command.AnalyzeTableCommand
-import org.apache.spark.sql.execution.datasources.{DataSourceAnalysis, FindDataSourceTable, PreprocessTableInsertion, ResolveDataSource}
+import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.streaming.{StreamingQuery, StreamingQueryManager}
 import org.apache.spark.sql.util.ExecutionListenerManager
 
@@ -38,21 +40,16 @@ import org.apache.spark.sql.util.ExecutionListenerManager
 /**
  * A class that holds all session-specific state in a given [[SparkSession]].
  */
-private[sql] abstract class SessionState(sparkSession: SparkSession) {
+private[sql] class SessionState(sparkSession: SparkSession) {
 
+  self =>
   // Note: These are all lazy vals because they depend on each other (e.g. conf) and we
   // want subclasses to override some of the fields. Otherwise, we would get a lot of NPEs.
-
-  protected lazy val parent: Option[SessionState] = None
 
   /**
    * SQL-specific key-value configurations.
    */
-  lazy val conf: SQLConf = parent.map(_.conf).getOrElse(new SQLConf)
-
-  private def withParent[T](parentVal: SessionState => T)(newVal: T): T = {
-    parent.map(parentVal(_)).getOrElse(newVal)
-  }
+  lazy val conf: SQLConf = new SQLConf
 
   def newHadoopConf(): Configuration = {
     val hadoopConf = new Configuration(sparkSession.sparkContext.hadoopConfiguration)
@@ -75,14 +72,12 @@ private[sql] abstract class SessionState(sparkSession: SparkSession) {
   /**
    * Internal catalog for managing functions registered by the user.
    */
-  lazy val functionRegistry: FunctionRegistry = withParent[FunctionRegistry](
-    (s: SessionState) => s.functionRegistry)(FunctionRegistry.builtin.copy())
+  lazy val functionRegistry: FunctionRegistry = FunctionRegistry.builtin.copy()
 
   /**
    * A class for loading resources specified by a function.
    */
-  lazy val functionResourceLoader: FunctionResourceLoader = withParent[FunctionResourceLoader](
-    (s: SessionState) => s.functionResourceLoader) {
+  lazy val functionResourceLoader: FunctionResourceLoader =
     new FunctionResourceLoader {
       override def loadResource(resource: FunctionResource): Unit = {
         resource.resourceType match {
@@ -95,39 +90,97 @@ private[sql] abstract class SessionState(sparkSession: SparkSession) {
         }
       }
     }
-  }
 
   /**
    * Internal catalog for managing table and database states.
    */
   lazy val catalog = new SessionCatalog(
-    sparkSession.sharedState.externalCatalog,
+    sparkSession,
+    sparkSession.sharedState.internalCatalog,
     functionResourceLoader,
     functionRegistry,
     conf,
     newHadoopConf())
 
+  private def registerDefaultCatalog() = {
+    val externalCatalog = new InMemoryCatalog(sparkSession.sparkContext.hadoopConfiguration)
+    val sessionCatalog = new DataSourceSessionCatalog(sparkSession, externalCatalog,
+      functionResourceLoader, functionRegistry, conf, catalog.hadoopConf, catalog.tempTables) {
+
+      override val analyzer: Analyzer = new Analyzer(catalog, conf) {
+        override val extendedResolutionRules = Nil
+        override val extendedCheckRules = Nil
+      }
+
+      override val optimizer: Optimizer = new SparkOptimizer(catalog, conf, new ExperimentalMethods)
+      {
+        override def batches = Nil
+      }
+
+      override def planner: Any = new SparkPlanner(self.sparkSession.sparkContext, conf, Nil) {
+        override def strategies: Seq[Strategy] = Nil
+      }
+    }
+    catalog.internalCatalog.registerDataSource(SessionCatalog.DEFAULT_DATASOURCE, sessionCatalog)
+    catalog.currentDataSource = SessionCatalog.DEFAULT_DATASOURCE
+  }
+
+  private def registerHiveCatalog() = {
+    val HIVE_EXTERNAL_CATALOG_CLASS_NAME = "org.apache.spark.sql.hive.HiveExternalCatalog"
+    val externalCatalog =
+    catalog.internalCatalog.registerDataSource("hive", HIVE_EXTERNAL_CATALOG_CLASS_NAME,
+      Map[String, String](), sparkSession.sparkContext)
+    catalog.currentDataSource = "hive"
+  }
+
+  sparkSession.sparkContext.conf.get(CATALOG_IMPLEMENTATION.key,
+    SessionCatalog.DEFAULT_DATASOURCE) match {
+    case SessionCatalog.DEFAULT_DATASOURCE => registerDefaultCatalog
+    case "hive" => registerHiveCatalog()
+  }
+  // the current db has to be created after the data source registration
+  catalog.createDatabase(CatalogDatabase(SessionCatalog.DEFAULT_DATABASE,
+    "default database", conf.warehousePath, Map()), ignoreIfExists = true)
+
   /**
    * Interface exposed to the user for registering user-defined functions.
    * Note that the user-defined functions must be deterministic.
    */
-  lazy val udf: UDFRegistration = withParent[UDFRegistration](
-    (s: SessionState) => s.udf)(new UDFRegistration(functionRegistry))
+  lazy val udf: UDFRegistration = new UDFRegistration(functionRegistry)
+
+  private def sessionCatalogs = catalog.internalCatalog.getSessionCatalogs(sparkSession)
+
+  // helper to combine children rules
+  private def combine[T](sss: Seq[DataSourceSessionCatalog],
+                         s: DataSourceSessionCatalog => Seq[T]): Seq[T] = {
+    sss.map(s(_)).reduceLeft(_ ++ _)
+  }
 
   /**
    * Logical query plan analyzer for resolving unresolved attributes and relations.
    */
-  lazy val analyzer: Analyzer = new Analyzer(catalog, conf)
+  lazy val analyzer: Analyzer = new Analyzer(catalog, conf) {
+    override val extendedResolutionRules = combine[Rule[LogicalPlan]](sessionCatalogs,
+      (s: DataSourceSessionCatalog) => s.analyzer.extendedResolutionRules) ++
+      (PreprocessTableInsertion(conf) ::
+        new FindDataSourceTable(sparkSession) :: DataSourceAnalysis(conf) ::
+          (if (conf.runSQLonFile) new ResolveDataSource(sparkSession) :: Nil else Nil))
+
+
+    override val extendedCheckRules = combine[LogicalPlan => Unit](sessionCatalogs,
+      (s: DataSourceSessionCatalog) => s.analyzer.extendedCheckRules) ++
+      Seq(PreWriteCheck(conf, catalog))
+  }
 
   /**
    * Logical query plan optimizer.
    */
   lazy val optimizer: Optimizer = new SparkOptimizer(catalog, conf, experimentalMethods) {
-    override def batches: Seq[Batch] =
-      // Need to add GetCurrentDatabase here since it is session-dependent
-      Batch("Finish Analysis", Once, GetCurrentDatabase(catalog)) ::
-        Batch("User Provided Optimizers", fixedPoint,
-          experimentalMethods.extraOptimizations: _*) :: Nil
+    override def execute(plan: LogicalPlan): LogicalPlan = {
+      super.execute(sessionCatalogs.foldLeft(plan) {
+        (p, x) => x.optimizer.execute(p)
+      })
+    }
   }
 
   /**
@@ -140,29 +193,30 @@ private[sql] abstract class SessionState(sparkSession: SparkSession) {
    */
   def planner: SparkPlanner =
     new SparkPlanner(sparkSession.sparkContext, conf, experimentalMethods.extraStrategies) {
-      override def strategies: Seq[Strategy] = Nil
+      override def strategies: Seq[Strategy] = combine[Strategy](sessionCatalogs,
+        (s: DataSourceSessionCatalog) => s.planner.asInstanceOf[SparkPlanner].strategies) ++
+        super.strategies
     }
 
   /**
    * An interface to register custom [[org.apache.spark.sql.util.QueryExecutionListener]]s
    * that listen for execution metrics.
    */
-  lazy val listenerManager: ExecutionListenerManager =
-    withParent[ExecutionListenerManager]((s: SessionState)
-      => s.listenerManager)(new ExecutionListenerManager)
+  lazy val listenerManager: ExecutionListenerManager = new ExecutionListenerManager
 
   /**
    * Interface to start and stop [[StreamingQuery]]s.
    */
-  lazy val streamingQueryManager: StreamingQueryManager =
-    withParent[StreamingQueryManager]((s: SessionState)
-      => s.streamingQueryManager)
-  {
-    new StreamingQueryManager(sparkSession)
-  }
+  lazy val streamingQueryManager: StreamingQueryManager = new StreamingQueryManager(sparkSession)
 
   private val jarClassLoader: NonClosableMutableURLClassLoader =
     sparkSession.sharedState.jarClassLoader
+
+  // Automatically extract all entries and put it in our SQLConf
+  // We need to call it after all of vals have been initialized.
+  sparkSession.sparkContext.getConf.getAll.foreach { case (k, v) =>
+    conf.setConfString(k, v)
+  }
 
   // ------------------------------------------------------
   //  Helper methods, partially leftover from pre-2.0 days
@@ -189,6 +243,7 @@ private[sql] abstract class SessionState(sparkSession: SparkSession) {
     }
     jarClassLoader.addURL(jarURL)
     Thread.currentThread().setContextClassLoader(jarClassLoader)
+    catalog.addJar(path)
   }
 
   /**
