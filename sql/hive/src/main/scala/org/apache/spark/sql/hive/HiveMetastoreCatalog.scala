@@ -49,7 +49,7 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Log
     .getDataSourceCatalog("hive").asInstanceOf[HiveExternalCatalog]
   private val client = catalog.client
   private val sessionCatalog = sparkSession.sharedState.internalCatalog
-      .getSessionCatalog("hive", this).asInstanceOf[HiveSessionCatalog]
+      .getSessionCatalog("hive", sessionState.catalog).asInstanceOf[HiveSessionCatalog]
 
   /** A fully qualified identifier for a table (i.e., database.tableName) */
   case class QualifiedTableName(database: String, name: String)

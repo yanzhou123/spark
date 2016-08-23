@@ -104,8 +104,8 @@ private[sql] class SessionState(sparkSession: SparkSession) {
 
   private def registerDefaultCatalog() = {
     val externalCatalog = new InMemoryCatalog(sparkSession.sparkContext.hadoopConfiguration)
-    val sessionCatalog = new DataSourceSessionCatalog(sparkSession, externalCatalog,
-      functionResourceLoader, functionRegistry, conf, catalog.hadoopConf, catalog.tempTables) {
+    val sessionCatalog = new DataSourceSessionCatalog(catalog, externalCatalog,
+      functionResourceLoader, functionRegistry, conf, catalog.hadoopConf) {
 
       override val analyzer: Analyzer = new Analyzer(catalog, conf) {
         override val extendedResolutionRules = Nil

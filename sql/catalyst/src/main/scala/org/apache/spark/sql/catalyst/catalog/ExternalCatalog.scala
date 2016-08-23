@@ -50,11 +50,11 @@ abstract class ExternalCatalog {
    * SparkSession in the core, the type parameter is used here which would be
    * unnecessary otherwise. Needs to be revisited when and should the module dependency
    * be changed
-   * @param sparkSession SparkSession
+   * @param sessionCatalog SessionCatalog
    * @return SessionState
    */
 
-  def getSessionCatalog(sparkSession: Any): DataSourceSessionCatalog
+  def getSessionCatalog(sessionCatalog: SessionCatalog): DataSourceSessionCatalog
 
   // --------------------------------------------------------------------------
   // Databases

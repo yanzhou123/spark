@@ -72,8 +72,8 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
 
   def sessionClient: HiveClient = client.newSession()
 
-  override def getSessionCatalog(sparkSession: Any): DataSourceSessionCatalog = {
-    val session = sparkSession.asInstanceOf[SparkSession]
+  override def getSessionCatalog(sessionCatalog: SessionCatalog): DataSourceSessionCatalog = {
+    val session = sessionCatalog.sparkSession.asInstanceOf[SparkSession]
     val sessionState = session.sessionState
     new HiveSessionCatalog(this, sessionClient, session, sessionState.functionResourceLoader,
       sessionState.functionRegistry, sessionState.conf, sessionState.catalog.hadoopConf)

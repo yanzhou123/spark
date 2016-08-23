@@ -28,6 +28,7 @@ import org.apache.spark.SparkException
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis._
+import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.util.StringUtils
 
 /**
@@ -107,10 +108,13 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
     }
   }
 
-  def getSessionCatalog(sparkSession: Any): DataSourceSessionCatalog = {
-    // In memory session catalog is to be prebuilt
-    throw new UnsupportedOperationException
-  }
+  override def getSessionCatalog(sessionCatalog: SessionCatalog): DataSourceSessionCatalog =
+    new DataSourceSessionCatalog(sessionCatalog, this) {
+      override def planner: Any = null
+
+      override val optimizer: Optimizer = null
+      override val analyzer: Analyzer = null
+    }
 
   // --------------------------------------------------------------------------
   // Databases

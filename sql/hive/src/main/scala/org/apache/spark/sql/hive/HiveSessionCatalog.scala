@@ -51,13 +51,12 @@ private[sql] class HiveSessionCatalog(
     conf: SQLConf,
     hadoopConf: Configuration)
   extends DataSourceSessionCatalog(
-    sparkSession,
+    sparkSession.sessionState.catalog,
     externalCatalog,
     functionResourceLoader,
     functionRegistry,
     conf,
-    hadoopConf,
-    sparkSession.sessionState.catalog.tempTables) {
+    hadoopConf) {
 
   self =>
 

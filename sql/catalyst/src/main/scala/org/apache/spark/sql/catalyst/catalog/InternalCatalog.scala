@@ -98,7 +98,7 @@ class InternalCatalog extends Serializable {
 
   def registerDataSource(name: String, sessionCatalog: DataSourceSessionCatalog): Unit = {
     externalCatalogMap.getOrElseUpdate(name, sessionCatalog.externalCatalog)
-    val sparkSession = sessionCatalog.sparkSession
+    val sparkSession = sessionCatalog.sessionCatalog.sparkSession
     var created = false
     sessionCatalogMap.getOrElseUpdate(sparkSession, {
       new ConcurrentHashMap[String, DataSourceSessionCatalog]().asScala
@@ -140,11 +140,12 @@ class InternalCatalog extends Serializable {
   // @param sparkSession SparkSession
   // @return SessionState
 
-  def getSessionCatalog(dataSource: String, sparkSession: Any): DataSourceSessionCatalog = {
-    sessionCatalogMap.getOrElseUpdate(sparkSession, {
+  def getSessionCatalog(dataSource: String,
+                        sessionCatalog: SessionCatalog): DataSourceSessionCatalog = {
+    sessionCatalogMap.getOrElseUpdate(sessionCatalog.sparkSession, {
       new ConcurrentHashMap[String, DataSourceSessionCatalog]().asScala
     }).getOrElseUpdate(dataSource, {
-      getExternalCatalog(dataSource).getSessionCatalog(sparkSession)
+      getExternalCatalog(dataSource).getSessionCatalog(sessionCatalog)
     })
   }
 
@@ -165,14 +166,14 @@ class InternalCatalog extends Serializable {
   // Databases
   // --------------------------------------------------------------------------
 
-  def createDatabase(sparkSession: Any, dataSource: String,
+  def createDatabase(sessionCatalog: SessionCatalog, dataSource: String,
                      dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = {
-    getSessionCatalog(dataSource, sparkSession).createDatabase(dbDefinition, ignoreIfExists)
+    getSessionCatalog(dataSource, sessionCatalog).createDatabase(dbDefinition, ignoreIfExists)
   }
 
-  def dropDatabase(sparkSession: Any, dataSource: String, db: String, ignoreIfNotExists: Boolean,
-                   cascade: Boolean): Unit = {
-    getSessionCatalog(dataSource, sparkSession).dropDatabase(db, ignoreIfNotExists, cascade)
+  def dropDatabase(sessionCatalog: SessionCatalog, dataSource: String,
+    db: String, ignoreIfNotExists: Boolean, cascade: Boolean): Unit = {
+    getSessionCatalog(dataSource, sessionCatalog).dropDatabase(db, ignoreIfNotExists, cascade)
   }
 
   // Alter a database whose name matches the one specified in `dbDefinition`,
@@ -180,51 +181,54 @@ class InternalCatalog extends Serializable {
   //
   // Note: If the underlying implementation does not support altering a certain field,
   // this becomes a no-op.
-  def alterDatabase(sparkSession: Any, dataSource: String, dbDefinition: CatalogDatabase): Unit = {
-    getSessionCatalog(dataSource, sparkSession).alterDatabase(dbDefinition)
+  def alterDatabase(sessionCatalog: SessionCatalog, dataSource: String,
+    dbDefinition: CatalogDatabase): Unit = {
+    getSessionCatalog(dataSource, sessionCatalog).alterDatabase(dbDefinition)
   }
 
-  def getDatabaseMetadata(sparkSession: Any, dataSource: String, db: String): CatalogDatabase = {
-    getSessionCatalog(dataSource, sparkSession).getDatabaseMetadata(db)
+  def getDatabaseMetadata(sessionCatalog: SessionCatalog, dataSource: String,
+    db: String): CatalogDatabase = {
+    getSessionCatalog(dataSource, sessionCatalog).getDatabaseMetadata(db)
   }
 
-  def databaseExists(sparkSession: Any, dataSource: String, db: String): Boolean = {
-    getSessionCatalog(dataSource, sparkSession).databaseExists(db)
+  def databaseExists(sessionCatalog: SessionCatalog, dataSource: String, db: String): Boolean = {
+    getSessionCatalog(dataSource, sessionCatalog).databaseExists(db)
   }
 
-  def listDatabases(sparkSession: Any, dataSource: String): Seq[String] = {
-    getSessionCatalog(dataSource, sparkSession).listDatabases()
+  def listDatabases(sessionCatalog: SessionCatalog, dataSource: String): Seq[String] = {
+    getSessionCatalog(dataSource, sessionCatalog).listDatabases()
   }
 
-  def listDatabases(sparkSession: Any, dataSource: String, pattern: String): Seq[String] = {
-    getSessionCatalog(dataSource, sparkSession).listDatabases(pattern)
+  def listDatabases(sessionCatalog: SessionCatalog, dataSource: String,
+                    pattern: String): Seq[String] = {
+    getSessionCatalog(dataSource, sessionCatalog).listDatabases(pattern)
   }
 
-  def getCurrentDatabase(sparkSession: Any, dataSource: String): String = {
-    getSessionCatalog(dataSource, sparkSession).getCurrentDatabase
+  def getCurrentDatabase(sessionCatalog: SessionCatalog, dataSource: String): String = {
+    getSessionCatalog(dataSource, sessionCatalog).getCurrentDatabase
   }
 
-  def setCurrentDatabase(sparkSession: Any, dataSource: String, db: String): Unit = {
-    getSessionCatalog(dataSource, sparkSession).setCurrentDatabase(db)
+  def setCurrentDatabase(sessionCatalog: SessionCatalog, dataSource: String, db: String): Unit = {
+    getSessionCatalog(dataSource, sessionCatalog).setCurrentDatabase(db)
   }
 
   // --------------------------------------------------------------------------
   // Tables
   // --------------------------------------------------------------------------
 
-  def createTable(sparkSession: Any, dataSource: String, tableDefinition: CatalogTable,
+  def createTable(sessionCatalog: SessionCatalog, dataSource: String, tableDefinition: CatalogTable,
                   ignoreIfExists: Boolean): Unit = {
-    getSessionCatalog(dataSource, sparkSession).createTable(tableDefinition, ignoreIfExists)
+    getSessionCatalog(dataSource, sessionCatalog).createTable(tableDefinition, ignoreIfExists)
   }
 
-  def dropTable(sparkSession: Any, dataSource: String, table: TableIdentifier,
+  def dropTable(sessionCatalog: SessionCatalog, dataSource: String, table: TableIdentifier,
                 ignoreIfNotExists: Boolean): Unit = {
-    getSessionCatalog(dataSource, sparkSession).dropTable(table, ignoreIfNotExists)
+    getSessionCatalog(dataSource, sessionCatalog).dropTable(table, ignoreIfNotExists)
   }
 
-  def renameTable(sparkSession: Any, dataSource: String, oldName: TableIdentifier,
+  def renameTable(sessionCatalog: SessionCatalog, dataSource: String, oldName: TableIdentifier,
                   newName: TableIdentifier): Unit = {
-    getSessionCatalog(dataSource, sparkSession).renameTable(oldName, newName)
+    getSessionCatalog(dataSource, sessionCatalog).renameTable(oldName, newName)
   }
 
   // Alter a table whose name that matches the one specified in `tableDefinition`,
@@ -232,41 +236,46 @@ class InternalCatalog extends Serializable {
   //
   // Note: If the underlying implementation does not support altering a certain field,
   // this becomes a no-op.
-  def alterTable(sparkSession: Any, dataSource: String, tableDefinition: CatalogTable): Unit = {
-    getSessionCatalog(dataSource, sparkSession).alterTable(tableDefinition)
+  def alterTable(sessionCatalog: SessionCatalog, dataSource: String,
+                 tableDefinition: CatalogTable): Unit = {
+    getSessionCatalog(dataSource, sessionCatalog).alterTable(tableDefinition)
   }
 
-  def lookupRelation(sparkSession: Any, dataSource: String, name: TableIdentifier,
+  def lookupRelation(sessionCatalog: SessionCatalog, dataSource: String, name: TableIdentifier,
                      alias: Option[String] = None): LogicalPlan = {
-    getSessionCatalog(dataSource, sparkSession).lookupRelation(name, alias)
+    getSessionCatalog(dataSource, sessionCatalog).lookupRelation(name, alias)
   }
 
-  def tableExists(sparkSession: Any, dataSource: String, name: TableIdentifier): Boolean = {
-    getSessionCatalog(dataSource, sparkSession).tableExists(name)
+  def tableExists(sessionCatalog: SessionCatalog, dataSource: String,
+                  name: TableIdentifier): Boolean = {
+    getSessionCatalog(dataSource, sessionCatalog).tableExists(name)
   }
 
-  def listTables(sparkSession: Any, dataSource: String, db: String): Seq[TableIdentifier] = {
-    getSessionCatalog(dataSource, sparkSession).listTables(db)
+  def listTables(sessionCatalog: SessionCatalog, dataSource: String,
+                 db: String): Seq[TableIdentifier] = {
+    getSessionCatalog(dataSource, sessionCatalog).listTables(db)
   }
 
-  def listTables(sparkSession: Any, dataSource: String,
+  def listTables(sessionCatalog: SessionCatalog, dataSource: String,
                  db: String, pattern: String): Seq[TableIdentifier] = {
-    getSessionCatalog(dataSource, sparkSession).listTables(db, pattern)
+    getSessionCatalog(dataSource, sessionCatalog).listTables(db, pattern)
   }
 
-  def loadTable(sparkSession: Any, dataSource: String,
+  def loadTable(sessionCatalog: SessionCatalog, dataSource: String,
                 name: TableIdentifier,
                 loadPath: String,
                 isOverwrite: Boolean,
                 holdDDLTime: Boolean): Unit = {
-    getSessionCatalog(dataSource, sparkSession).loadTable(name, loadPath, isOverwrite, holdDDLTime)
+    getSessionCatalog(dataSource, sessionCatalog)
+      .loadTable(name, loadPath, isOverwrite, holdDDLTime)
   }
 
-  def refreshTable(sparkSession: Any, dataSource: String, name: TableIdentifier): Unit = {
-    getSessionCatalog(dataSource, sparkSession).refreshTable(name)
+  def refreshTable(sessionCatalog: SessionCatalog, dataSource: String,
+                   name: TableIdentifier): Unit = {
+    getSessionCatalog(dataSource, sessionCatalog).refreshTable(name)
   }
 
-  def loadPartition(sparkSession: Any, dataSource: String,
+  def loadPartition(sessionCatalog: SessionCatalog, dataSource: String,
                     name: TableIdentifier,
                     loadPath: String,
                     partition: TablePartitionSpec,
@@ -274,7 +283,7 @@ class InternalCatalog extends Serializable {
                     holdDDLTime: Boolean,
                     inheritTableSpecs: Boolean,
                     isSkewedStoreAsSubdir: Boolean): Unit = {
-    getSessionCatalog(dataSource, sparkSession).loadPartition(name, loadPath,
+    getSessionCatalog(dataSource, sessionCatalog).loadPartition(name, loadPath,
       partition, isOverwrite, holdDDLTime, inheritTableSpecs, isSkewedStoreAsSubdir)
   }
 
@@ -282,28 +291,28 @@ class InternalCatalog extends Serializable {
   // Partitions
   // --------------------------------------------------------------------------
 
-  def createPartitions(sparkSession: Any, dataSource: String,
+  def createPartitions(sessionCatalog: SessionCatalog, dataSource: String,
                        name: TableIdentifier,
                        parts: Seq[CatalogTablePartition],
                        ignoreIfExists: Boolean): Unit = {
-    getSessionCatalog(dataSource, sparkSession).createPartitions(name, parts, ignoreIfExists)
+    getSessionCatalog(dataSource, sessionCatalog).createPartitions(name, parts, ignoreIfExists)
   }
 
-  def dropPartitions(sparkSession: Any,
+  def dropPartitions(sessionCatalog: SessionCatalog,
                      dataSource: String,
                      name: TableIdentifier,
                      parts: Seq[TablePartitionSpec],
                      ignoreIfNotExists: Boolean): Unit = {
-    getSessionCatalog(dataSource, sparkSession).dropPartitions(name, parts, ignoreIfNotExists)
+    getSessionCatalog(dataSource, sessionCatalog).dropPartitions(name, parts, ignoreIfNotExists)
   }
 
   // Override the specs of one or many existing table partitions, assuming they exist.
   // This assumes index i of `specs` corresponds to index i of `newSpecs`.
-  def renamePartitions(sparkSession: Any, dataSource: String,
+  def renamePartitions(sessionCatalog: SessionCatalog, dataSource: String,
                        name: TableIdentifier,
                        specs: Seq[TablePartitionSpec],
                        newSpecs: Seq[TablePartitionSpec]): Unit = {
-    getSessionCatalog(dataSource, sparkSession).renamePartitions(name, specs, newSpecs)
+    getSessionCatalog(dataSource, sessionCatalog).renamePartitions(name, specs, newSpecs)
   }
 
   // Alter one or many table partitions whose specs that match those specified in `parts`,
@@ -311,72 +320,73 @@ class InternalCatalog extends Serializable {
   //
   // Note: If the underlying implementation does not support altering a certain field,
   // this becomes a no-op.
-  def alterPartitions(sparkSession: Any, dataSource: String,
+  def alterPartitions(sessionCatalog: SessionCatalog, dataSource: String,
                       name: TableIdentifier,
                       parts: Seq[CatalogTablePartition]): Unit = {
-    getSessionCatalog(dataSource, sparkSession).alterPartitions(name, parts)
+    getSessionCatalog(dataSource, sessionCatalog).alterPartitions(name, parts)
   }
 
-  def getPartition(sparkSession: Any, dataSource: String, name: TableIdentifier,
+  def getPartition(sessionCatalog: SessionCatalog, dataSource: String, name: TableIdentifier,
                    spec: TablePartitionSpec): CatalogTablePartition = {
-    getSessionCatalog(dataSource, sparkSession).getPartition(name, spec)
+    getSessionCatalog(dataSource, sessionCatalog).getPartition(name, spec)
   }
 
-  def listPartitions(sparkSession: Any, dataSource: String,
+  def listPartitions(sessionCatalog: SessionCatalog, dataSource: String,
                      name: TableIdentifier,
                      partialSpec: Option[TablePartitionSpec] = None): Seq[CatalogTablePartition] = {
-    getSessionCatalog(dataSource, sparkSession).listPartitions(name, partialSpec)
+    getSessionCatalog(dataSource, sessionCatalog).listPartitions(name, partialSpec)
   }
 
-  def getTableMetadata(sparkSession: Any, dataSource: String,
+  def getTableMetadata(sessionCatalog: SessionCatalog, dataSource: String,
                        name: TableIdentifier): CatalogTable = {
-    getSessionCatalog(dataSource, sparkSession).getTableMetadata(name)
+    getSessionCatalog(dataSource, sessionCatalog).getTableMetadata(name)
   }
 
-  def getTableMetadataOption(sparkSession: Any, dataSource: String,
+  def getTableMetadataOption(sessionCatalog: SessionCatalog, dataSource: String,
                              name: TableIdentifier): Option[CatalogTable] = {
-    getSessionCatalog(dataSource, sparkSession).getTableMetadataOption(name)
+    getSessionCatalog(dataSource, sessionCatalog).getTableMetadataOption(name)
   }
 
   // --------------------------------------------------------------------------
   // Functions
   // --------------------------------------------------------------------------
 
-  def createFunction(sparkSession: Any, dataSource: String,
+  def createFunction(sessionCatalog: SessionCatalog, dataSource: String,
                      funcDefinition: CatalogFunction, ignoreIfExists: Boolean): Unit = {
-    getSessionCatalog(dataSource, sparkSession).createFunction(funcDefinition, ignoreIfExists)
+    getSessionCatalog(dataSource, sessionCatalog).createFunction(funcDefinition, ignoreIfExists)
   }
 
-  def dropFunction(sparkSession: Any, dataSource: String,
+  def dropFunction(sessionCatalog: SessionCatalog, dataSource: String,
                    name: FunctionIdentifier, ignoreIfNotExists: Boolean): Unit = {
-    getSessionCatalog(dataSource, sparkSession).dropFunction(name, ignoreIfNotExists)
+    getSessionCatalog(dataSource, sessionCatalog).dropFunction(name, ignoreIfNotExists)
   }
 
-  def getFunctionMetadata(sparkSession: Any, dataSource: String,
+  def getFunctionMetadata(sessionCatalog: SessionCatalog, dataSource: String,
                           name: FunctionIdentifier): CatalogFunction = {
-    getSessionCatalog(dataSource, sparkSession).getFunctionMetadata(name)
+    getSessionCatalog(dataSource, sessionCatalog).getFunctionMetadata(name)
   }
 
-  def functionExists(sparkSession: Any, dataSource: String, name: FunctionIdentifier): Boolean = {
-    getSessionCatalog(dataSource, sparkSession).functionExists(name)
+  def functionExists(sessionCatalog: SessionCatalog, dataSource: String,
+                     name: FunctionIdentifier): Boolean = {
+    getSessionCatalog(dataSource, sessionCatalog).functionExists(name)
   }
 
-  def lookupFunction(sparkSession: Any, dataSource: String,
+  def lookupFunction(sessionCatalog: SessionCatalog, dataSource: String,
                      name: FunctionIdentifier, children: Seq[Expression]): Expression = {
-    getSessionCatalog(dataSource, sparkSession).lookupFunction(name, children)
+    getSessionCatalog(dataSource, sessionCatalog).lookupFunction(name, children)
   }
 
-  def lookupFunctionInfo(sparkSession: Any, dataSource: String,
+  def lookupFunctionInfo(sessionCatalog: SessionCatalog, dataSource: String,
                      name: FunctionIdentifier): ExpressionInfo = {
-    getSessionCatalog(dataSource, sparkSession).lookupFunctionInfo(name)
+    getSessionCatalog(dataSource, sessionCatalog).lookupFunctionInfo(name)
   }
 
-  def listFunctions(sparkSession: Any, dataSource: String,
+  def listFunctions(sessionCatalog: SessionCatalog, dataSource: String,
                     db: String, pattern: String): Seq[(FunctionIdentifier, String)] = {
-    getSessionCatalog(dataSource, sparkSession).listFunctions(db, pattern)
+    getSessionCatalog(dataSource, sessionCatalog).listFunctions(db, pattern)
   }
 
-  def addJar(sparkSession: Any, dataSource: String, path: String): Unit = {
-    getSessionCatalog(dataSource, sparkSession).addJar(path)
+  def addJar(sessionCatalog: SessionCatalog, dataSource: String, path: String): Unit = {
+    getSessionCatalog(dataSource, sessionCatalog).addJar(path)
   }
 }

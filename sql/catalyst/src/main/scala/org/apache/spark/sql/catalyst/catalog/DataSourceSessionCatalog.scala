@@ -19,14 +19,12 @@ package org.apache.spark.sql.catalyst.catalog
 
 import javax.annotation.concurrent.GuardedBy
 
-import scala.collection.mutable
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.AnalysisException
-import org.apache.spark.sql.catalyst.{CatalystConf, FunctionIdentifier, TableIdentifier}
+import org.apache.spark.sql.catalyst.{CatalystConf, FunctionIdentifier, SimpleCatalystConf, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.analysis.FunctionRegistry.FunctionBuilder
 import org.apache.spark.sql.catalyst.expressions.{Expression, ExpressionInfo}
@@ -46,32 +44,27 @@ object DataSourceSessionCatalog {
  * This class must be thread-safe.
  */
 abstract class DataSourceSessionCatalog(
-    val sparkSession: Any,
+    val sessionCatalog: SessionCatalog,
     val externalCatalog: ExternalCatalog,
     functionResourceLoader: FunctionResourceLoader,
     functionRegistry: FunctionRegistry,
     conf: CatalystConf,
-    hadoopConf: Configuration,
-    protected val tempTables: mutable.HashMap[String, LogicalPlan]
-      = new mutable.HashMap[String, LogicalPlan]) extends Logging {
+    hadoopConf: Configuration) extends Logging {
 
   import SessionCatalog._
   import CatalogTypes.TablePartitionSpec
 
   // For testing only.
+
   def this(
-            externalCatalog: ExternalCatalog,
-            functionRegistry: FunctionRegistry,
-            conf: CatalystConf) {
-    this(
-      None,
-      externalCatalog,
-      DummyFunctionResourceLoader,
-      functionRegistry,
-      conf,
-      new Configuration(),
-      new mutable.HashMap[String, LogicalPlan])
+          sessionCatalog: SessionCatalog,
+          externalCatalog: ExternalCatalog
+          ) {
+    this(sessionCatalog, externalCatalog, sessionCatalog.functionResourceLoader,
+      sessionCatalog.functionRegistry, sessionCatalog.conf, sessionCatalog.hadoopConf)
   }
+
+  lazy val tempTables = sessionCatalog.tempTables
 
   // Note: we track current database here because certain operations do not explicitly
   // specify the database (e.g. DROP TABLE my_table). In these cases we must first

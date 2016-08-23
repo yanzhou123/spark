@@ -46,12 +46,12 @@ object SessionCatalog {
  * This class must be thread-safe.
  */
 class SessionCatalog(
-    sparkSession: Any,
+    private[sql] val sparkSession: Any,
     val internalCatalog: InternalCatalog,
-    functionResourceLoader: FunctionResourceLoader,
-    functionRegistry: FunctionRegistry,
-    conf: CatalystConf,
-    val hadoopConf: Configuration) extends Logging {
+    private[catalyst] val functionResourceLoader: FunctionResourceLoader,
+    private[catalyst] val functionRegistry: FunctionRegistry,
+    private[catalyst] val conf: CatalystConf,
+    private[sql] val hadoopConf: Configuration) extends Logging {
   import SessionCatalog._
   import CatalogTypes.TablePartitionSpec
 
@@ -160,40 +160,40 @@ class SessionCatalog(
   // ----------------------------------------------------------------------------
 
   def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = {
-    internalCatalog.createDatabase(sparkSession, currentDataSource, dbDefinition, ignoreIfExists)
+    internalCatalog.createDatabase(this, currentDataSource, dbDefinition, ignoreIfExists)
   }
 
   def dropDatabase(db: String, ignoreIfNotExists: Boolean, cascade: Boolean): Unit = {
-    internalCatalog.dropDatabase(sparkSession, currentDataSource, db, ignoreIfNotExists, cascade)
+    internalCatalog.dropDatabase(this, currentDataSource, db, ignoreIfNotExists, cascade)
   }
 
   def alterDatabase(dbDefinition: CatalogDatabase): Unit = {
-    internalCatalog.alterDatabase(sparkSession, currentDataSource, dbDefinition)
+    internalCatalog.alterDatabase(this, currentDataSource, dbDefinition)
   }
 
   def getDatabaseMetadata(db: String): CatalogDatabase = {
-    internalCatalog.getDatabaseMetadata(sparkSession, currentDataSource, db)
+    internalCatalog.getDatabaseMetadata(this, currentDataSource, db)
   }
 
   def databaseExists(db: String): Boolean = {
-    internalCatalog.databaseExists(sparkSession, currentDataSource, db)
+    internalCatalog.databaseExists(this, currentDataSource, db)
   }
 
   def listDatabases(): Seq[String] = {
-    internalCatalog.listDatabases(sparkSession, currentDataSource)
+    internalCatalog.listDatabases(this, currentDataSource)
   }
 
   def listDatabases(pattern: String): Seq[String] = {
-    internalCatalog.listDatabases(sparkSession, currentDataSource, pattern)
+    internalCatalog.listDatabases(this, currentDataSource, pattern)
   }
 
   def getCurrentDatabase: String = {
-    internalCatalog.getCurrentDatabase(sparkSession, currentDataSource)
+    internalCatalog.getCurrentDatabase(this, currentDataSource)
   }
 
   def setCurrentDatabase(db: String): Unit = {
     // requireDbExists(dbName)
-    internalCatalog.setCurrentDatabase(sparkSession, currentDataSource, db)
+    internalCatalog.setCurrentDatabase(this, currentDataSource, db)
   }
 
   def setCurrentDataSource(name: String): Unit = {
@@ -230,7 +230,7 @@ class SessionCatalog(
    */
   def createTable(tableDefinition: CatalogTable, ignoreIfExists: Boolean): Unit = {
     // requireDbExists(db)
-    internalCatalog.createTable(sparkSession, currentDataSource, tableDefinition, ignoreIfExists)
+    internalCatalog.createTable(this, currentDataSource, tableDefinition, ignoreIfExists)
   }
 
   /**
@@ -244,7 +244,7 @@ class SessionCatalog(
    */
   def alterTable(tableDefinition: CatalogTable): Unit = {
     // requireDbExists(db)
-    internalCatalog.alterTable(sparkSession, currentDataSource, tableDefinition)
+    internalCatalog.alterTable(this, currentDataSource, tableDefinition)
   }
 
   /**
@@ -254,7 +254,7 @@ class SessionCatalog(
    */
   def getTableMetadata(name: TableIdentifier): CatalogTable = {
     // requireDbExists(db)
-    internalCatalog.getTableMetadata(sparkSession, currentDataSource, name)
+    internalCatalog.getTableMetadata(this, currentDataSource, name)
   }
 
   /**
@@ -264,7 +264,7 @@ class SessionCatalog(
    */
   def getTableMetadataOption(name: TableIdentifier): Option[CatalogTable] = {
     // requireDbExists(db)
-    internalCatalog.getTableMetadataOption(sparkSession, currentDataSource, name)
+    internalCatalog.getTableMetadataOption(this, currentDataSource, name)
   }
 
   /**
@@ -278,7 +278,7 @@ class SessionCatalog(
       isOverwrite: Boolean,
       holdDDLTime: Boolean): Unit = {
     // requireDbExists(db)
-    internalCatalog.loadTable(sparkSession, currentDataSource,
+    internalCatalog.loadTable(this, currentDataSource,
       name, loadPath, isOverwrite, holdDDLTime)
   }
 
@@ -296,7 +296,7 @@ class SessionCatalog(
       inheritTableSpecs: Boolean,
       isSkewedStoreAsSubdir: Boolean): Unit = {
     // requireDbExists(db)
-    internalCatalog.loadPartition(sparkSession, currentDataSource, name, loadPath, partition,
+    internalCatalog.loadPartition(this, currentDataSource, name, loadPath, partition,
       isOverwrite, holdDDLTime,
       inheritTableSpecs, isSkewedStoreAsSubdir)
   }
@@ -336,7 +336,7 @@ class SessionCatalog(
    * This assumes the database specified in `oldName` matches the one specified in `newName`.
    */
   def renameTable(oldName: TableIdentifier, newName: TableIdentifier): Unit = synchronized {
-    internalCatalog.renameTable(sparkSession, currentDataSource, oldName, newName)
+    internalCatalog.renameTable(this, currentDataSource, oldName, newName)
   }
 
   /**
@@ -348,7 +348,7 @@ class SessionCatalog(
    */
   def dropTable(name: TableIdentifier, ignoreIfNotExists: Boolean): Unit = synchronized {
     //  requireDbExists(db)
-    internalCatalog.dropTable(sparkSession, currentDataSource, name, ignoreIfNotExists = true)
+    internalCatalog.dropTable(this, currentDataSource, name, ignoreIfNotExists)
   }
 
   /**
@@ -360,7 +360,7 @@ class SessionCatalog(
    */
   def lookupRelation(name: TableIdentifier, alias: Option[String] = None): LogicalPlan = {
     synchronized {
-      internalCatalog.lookupRelation(sparkSession, currentDataSource, name, alias)
+      internalCatalog.lookupRelation(this, currentDataSource, name, alias)
     }
   }
 
@@ -373,7 +373,7 @@ class SessionCatalog(
    * contain the table.
    */
   def tableExists(name: TableIdentifier): Boolean = synchronized {
-    internalCatalog.tableExists(sparkSession, currentDataSource, name)
+    internalCatalog.tableExists(this, currentDataSource, name)
   }
 
   /**
@@ -396,14 +396,14 @@ class SessionCatalog(
    */
   def listTables(db: String, pattern: String): Seq[TableIdentifier] = {
     // requireDbExists(dbName)
-    internalCatalog.listTables(sparkSession, currentDataSource, db, pattern)
+    internalCatalog.listTables(this, currentDataSource, db, pattern)
   }
 
   /**
    * Refresh the cache entry for a metastore table, if any.
    */
   def refreshTable(name: TableIdentifier): Unit = {
-    internalCatalog.refreshTable(sparkSession, currentDataSource, name)
+    internalCatalog.refreshTable(this, currentDataSource, name)
   }
 
   /**
@@ -443,7 +443,7 @@ class SessionCatalog(
       parts: Seq[CatalogTablePartition],
       ignoreIfExists: Boolean): Unit = {
     // requireDbExists(db)
-    internalCatalog.createPartitions(sparkSession, currentDataSource, tableName,
+    internalCatalog.createPartitions(this, currentDataSource, tableName,
       parts, ignoreIfExists)
   }
 
@@ -456,7 +456,7 @@ class SessionCatalog(
       specs: Seq[TablePartitionSpec],
       ignoreIfNotExists: Boolean): Unit = {
     // requireDbExists(db)
-    internalCatalog.dropPartitions(sparkSession, currentDataSource,
+    internalCatalog.dropPartitions(this, currentDataSource,
       tableName, specs, ignoreIfNotExists)
   }
 
@@ -471,7 +471,7 @@ class SessionCatalog(
       specs: Seq[TablePartitionSpec],
       newSpecs: Seq[TablePartitionSpec]): Unit = {
     // requireDbExists(db)
-    internalCatalog.renamePartitions(sparkSession, currentDataSource, tableName, specs, newSpecs)
+    internalCatalog.renamePartitions(this, currentDataSource, tableName, specs, newSpecs)
   }
 
   /**
@@ -485,7 +485,7 @@ class SessionCatalog(
    */
   def alterPartitions(tableName: TableIdentifier, parts: Seq[CatalogTablePartition]): Unit = {
     // requireDbExists(db)
-    internalCatalog.alterPartitions(sparkSession, currentDataSource, tableName, parts)
+    internalCatalog.alterPartitions(this, currentDataSource, tableName, parts)
   }
 
   /**
@@ -494,7 +494,7 @@ class SessionCatalog(
    */
   def getPartition(tableName: TableIdentifier, spec: TablePartitionSpec): CatalogTablePartition = {
     // requireDbExists(db)
-    internalCatalog.getPartition(sparkSession, currentDataSource, tableName, spec)
+    internalCatalog.getPartition(this, currentDataSource, tableName, spec)
   }
 
   /**
@@ -508,7 +508,7 @@ class SessionCatalog(
       tableName: TableIdentifier,
       partialSpec: Option[TablePartitionSpec] = None): Seq[CatalogTablePartition] = {
     // requireDbExists(db)
-    internalCatalog.listPartitions(sparkSession, currentDataSource, tableName, partialSpec)
+    internalCatalog.listPartitions(this, currentDataSource, tableName, partialSpec)
   }
 
   /**
@@ -565,7 +565,7 @@ class SessionCatalog(
    * If no such database is specified, create it in the current database.
    */
   def createFunction(funcDefinition: CatalogFunction, ignoreIfExists: Boolean): Unit = {
-    internalCatalog.createFunction(sparkSession, currentDataSource, funcDefinition, ignoreIfExists)
+    internalCatalog.createFunction(this, currentDataSource, funcDefinition, ignoreIfExists)
   }
 
   /**
@@ -574,7 +574,7 @@ class SessionCatalog(
    */
   def dropFunction(name: FunctionIdentifier, ignoreIfNotExists: Boolean): Unit = {
     // requireDbExists(db)
-    internalCatalog.dropFunction(sparkSession, currentDataSource, name, ignoreIfNotExists)
+    internalCatalog.dropFunction(this, currentDataSource, name, ignoreIfNotExists)
   }
 
   /**
@@ -585,7 +585,7 @@ class SessionCatalog(
    */
   def getFunctionMetadata(name: FunctionIdentifier): CatalogFunction = {
     // requireDbExists(db)
-    internalCatalog.getFunctionMetadata(sparkSession, currentDataSource, name)
+    internalCatalog.getFunctionMetadata(this, currentDataSource, name)
   }
 
   /**
@@ -593,7 +593,7 @@ class SessionCatalog(
    */
   def functionExists(name: FunctionIdentifier): Boolean = {
     // requireDbExists(db)
-    internalCatalog.functionExists(sparkSession, currentDataSource, name)
+    internalCatalog.functionExists(this, currentDataSource, name)
   }
 
   // ----------------------------------------------------------------
@@ -651,7 +651,7 @@ class SessionCatalog(
    */
   private[spark] def lookupFunctionInfo(name: FunctionIdentifier): ExpressionInfo = synchronized {
     // requireDbExists(db)
-    internalCatalog.lookupFunctionInfo(sparkSession, currentDataSource, name)
+    internalCatalog.lookupFunctionInfo(this, currentDataSource, name)
   }
 
   /**
@@ -670,7 +670,7 @@ class SessionCatalog(
   def lookupFunction(
       name: FunctionIdentifier,
       children: Seq[Expression]): Expression = synchronized {
-    internalCatalog.lookupFunction(sparkSession, currentDataSource, name, children)
+    internalCatalog.lookupFunction(this, currentDataSource, name, children)
   }
 
   /**
@@ -686,7 +686,7 @@ class SessionCatalog(
    * defined).
    */
   def listFunctions(db: String, pattern: String): Seq[(FunctionIdentifier, String)] = {
-    internalCatalog.listFunctions(sparkSession, currentDataSource, db, pattern)
+    internalCatalog.listFunctions(this, currentDataSource, db, pattern)
   }
 
 
@@ -728,10 +728,10 @@ class SessionCatalog(
   }
 
   def addJar(path: String): Unit = {
-    internalCatalog.addJar(sparkSession, currentDataSource, path)
+    internalCatalog.addJar(this, currentDataSource, path)
   }
 
   def getDataSourceSessionCatalog(dataSource: String): DataSourceSessionCatalog = {
-    internalCatalog.getSessionCatalog(dataSource, sparkSession)
+    internalCatalog.getSessionCatalog(dataSource, this)
   }
 }
