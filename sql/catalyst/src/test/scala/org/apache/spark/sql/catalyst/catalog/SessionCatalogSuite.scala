@@ -98,8 +98,8 @@ class SessionCatalogSuite extends SparkFunSuite {
     // Throw exception if there are functions left
     val externalCatalog1 = newBasicCatalog()
     val sessionCatalog1 = new SessionCatalog(new InternalCatalog(externalCatalog1))
-    externalCatalog1.dropTable("db2", "tbl1", ignoreIfNotExists = false)
-    externalCatalog1.dropTable("db2", "tbl2", ignoreIfNotExists = false)
+    externalCatalog1.dropTable(TableIdentifier("tbl1", Some("db2")), ignoreIfNotExists = false)
+    externalCatalog1.dropTable(TableIdentifier("tbl2", Some("db2")), ignoreIfNotExists = false)
     intercept[AnalysisException] {
       sessionCatalog1.dropDatabase("db2", ignoreIfNotExists = false, cascade = false)
     }
@@ -325,16 +325,16 @@ class SessionCatalogSuite extends SparkFunSuite {
   test("alter table") {
     val externalCatalog = newBasicCatalog()
     val sessionCatalog = new SessionCatalog(new InternalCatalog(externalCatalog))
-    val tbl1 = externalCatalog.getTable("db2", "tbl1")
+    val tbl1 = externalCatalog.getTable(TableIdentifier("tbl1", Some("db2")))
     sessionCatalog.alterTable(tbl1.copy(properties = Map("toh" -> "frem")))
-    val newTbl1 = externalCatalog.getTable("db2", "tbl1")
+    val newTbl1 = externalCatalog.getTable(TableIdentifier("tbl1", Some("db2")))
     assert(!tbl1.properties.contains("toh"))
     assert(newTbl1.properties.size == tbl1.properties.size + 1)
     assert(newTbl1.properties.get("toh") == Some("frem"))
     // Alter table without explicitly specifying database
     sessionCatalog.setCurrentDatabase("db2")
     sessionCatalog.alterTable(tbl1.copy(identifier = TableIdentifier("tbl1")))
-    val newestTbl1 = externalCatalog.getTable("db2", "tbl1")
+    val newestTbl1 = externalCatalog.getTable(TableIdentifier("tbl1", Some("db2")))
     assert(newestTbl1 == tbl1)
   }
 
@@ -352,11 +352,11 @@ class SessionCatalogSuite extends SparkFunSuite {
     val externalCatalog = newBasicCatalog()
     val sessionCatalog = new SessionCatalog(new InternalCatalog(externalCatalog))
     assert(sessionCatalog.getTableMetadata(TableIdentifier("tbl1", Some("db2")))
-      == externalCatalog.getTable("db2", "tbl1"))
+      == externalCatalog.getTable(TableIdentifier("tbl1", Some("db2"))))
     // Get table without explicitly specifying database
     sessionCatalog.setCurrentDatabase("db2")
     assert(sessionCatalog.getTableMetadata(TableIdentifier("tbl1"))
-      == externalCatalog.getTable("db2", "tbl1"))
+      == externalCatalog.getTable(TableIdentifier("tbl1", Some("db2"))))
   }
 
   test("get table when database/table does not exist") {
@@ -373,7 +373,7 @@ class SessionCatalogSuite extends SparkFunSuite {
     val externalCatalog = newBasicCatalog()
     val catalog = new SessionCatalog(new InternalCatalog(externalCatalog))
     assert(catalog.getTableMetadataOption(TableIdentifier("tbl1", Some("db2")))
-      == Option(externalCatalog.getTable("db2", "tbl1")))
+      == Option(externalCatalog.getTable(TableIdentifier("tbl1", Some("db2")))))
     assert(catalog.getTableMetadataOption(TableIdentifier("unknown_table", Some("db2"))).isEmpty)
     intercept[NoSuchDatabaseException] {
       catalog.getTableMetadataOption(TableIdentifier("tbl1", Some("unknown_db")))
@@ -384,7 +384,7 @@ class SessionCatalogSuite extends SparkFunSuite {
     val externalCatalog = newBasicCatalog()
     val sessionCatalog = new SessionCatalog(new InternalCatalog(externalCatalog))
     val tempTable1 = Range(1, 10, 1, 10)
-    val metastoreTable1 = externalCatalog.getTable("db2", "tbl1")
+    val metastoreTable1 = externalCatalog.getTable(TableIdentifier("tbl1", Some("db2")))
     sessionCatalog.createTempView("tbl1", tempTable1, overrideIfExists = false)
     sessionCatalog.setCurrentDatabase("db2")
     // If we explicitly specify the database, we'll look up the relation in that database
@@ -583,7 +583,7 @@ class SessionCatalogSuite extends SparkFunSuite {
       TableIdentifier("tbl2"),
       Seq(part2.spec),
       ignoreIfNotExists = false)
-    assert(externalCatalog.listPartitions("db2", "tbl2").isEmpty)
+    assert(externalCatalog.listPartitions(TableIdentifier("tbl2", Some("db2"))).isEmpty)
     // Drop multiple partitions at once
     sessionCatalog.createPartitions(
       TableIdentifier("tbl2", Some("db2")), Seq(part1, part2), ignoreIfExists = false)
@@ -592,7 +592,7 @@ class SessionCatalogSuite extends SparkFunSuite {
       TableIdentifier("tbl2", Some("db2")),
       Seq(part1.spec, part2.spec),
       ignoreIfNotExists = false)
-    assert(externalCatalog.listPartitions("db2", "tbl2").isEmpty)
+    assert(externalCatalog.listPartitions(TableIdentifier("tbl2", Some("db2"))).isEmpty)
   }
 
   test("drop partitions when database/table does not exist") {

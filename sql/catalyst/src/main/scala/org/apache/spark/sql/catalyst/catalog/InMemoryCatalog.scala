@@ -75,13 +75,13 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
   }
 
   private def requireTableExists(db: String, table: String): Unit = {
-    if (!tableExists(db, table)) {
+    if (!tableExists(TableIdentifier(table, Some(db)))) {
       throw new NoSuchTableException(db = db, table = table)
     }
   }
 
   private def requireTableNotExists(db: String, table: String): Unit = {
-    if (tableExists(db, table)) {
+    if (tableExists(TableIdentifier(table, Some(db)))) {
       throw new TableAlreadyExistsException(db = db, table = table)
     }
   }
@@ -203,12 +203,12 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
   // --------------------------------------------------------------------------
 
   override def createTable(
-      db: String,
       tableDefinition: CatalogTable,
       ignoreIfExists: Boolean): Unit = synchronized {
+    val db = tableDefinition.identifier.database.getOrElse("")
     requireDbExists(db)
     val table = tableDefinition.identifier.table
-    if (tableExists(db, table)) {
+    if (tableExists(TableIdentifier(table, Some(db)))) {
       if (!ignoreIfExists) {
         throw new TableAlreadyExistsException(db = db, table = table)
       }
@@ -229,12 +229,13 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
   }
 
   override def dropTable(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       ignoreIfNotExists: Boolean): Unit = synchronized {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     requireDbExists(db)
-    if (tableExists(db, table)) {
-      if (getTable(db, table).tableType == CatalogTableType.MANAGED) {
+    if (tableExists(TableIdentifier(table, Some(db)))) {
+      if (getTable(TableIdentifier(table, Some(db))).tableType == CatalogTableType.MANAGED) {
         val dir = new Path(catalog(db).db.locationUri, table)
         try {
           val fs = dir.getFileSystem(hadoopConfig)
@@ -253,7 +254,9 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
     }
   }
 
-  override def renameTable(db: String, oldName: String, newName: String): Unit = synchronized {
+  override def renameTable(tableIdentifier: TableIdentifier, newName: String): Unit = synchronized {
+    val db = tableIdentifier.database.getOrElse("")
+    val oldName = tableIdentifier.table
     requireTableExists(db, oldName)
     requireTableNotExists(db, newName)
     val oldDesc = catalog(db).tables(oldName)
@@ -276,21 +279,33 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
     catalog(db).tables.remove(oldName)
   }
 
-  override def alterTable(db: String, tableDefinition: CatalogTable): Unit = synchronized {
+  override def alterTable(tableDefinition: CatalogTable): Unit = synchronized {
+    val db = tableDefinition.identifier.database.getOrElse("")
     requireTableExists(db, tableDefinition.identifier.table)
     catalog(db).tables(tableDefinition.identifier.table).table = tableDefinition
   }
 
-  override def getTable(db: String, table: String): CatalogTable = synchronized {
+  override def getTable(tableIdentifier: TableIdentifier): CatalogTable = synchronized {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     requireTableExists(db, table)
     catalog(db).tables(table).table
   }
 
-  override def getTableOption(db: String, table: String): Option[CatalogTable] = synchronized {
-    if (!tableExists(db, table)) None else Option(catalog(db).tables(table).table)
-  }
+  override def getTableOption(tableIdentifier: TableIdentifier): Option[CatalogTable] =
+    synchronized {
+      val db = tableIdentifier.database.getOrElse("")
+      val table = tableIdentifier.table
+      if (!tableExists(TableIdentifier(table, Some(db)))) {
+        None
+      } else {
+        Option(catalog(db).tables(table).table)
+      }
+    }
 
-  override def tableExists(db: String, table: String): Boolean = synchronized {
+  override def tableExists(tableIdentifier: TableIdentifier): Boolean = synchronized {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     requireDbExists(db)
     catalog(db).tables.contains(table)
   }
@@ -305,8 +320,7 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
   }
 
   override def loadTable(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       loadPath: String,
       isOverwrite: Boolean,
       holdDDLTime: Boolean): Unit = {
@@ -314,8 +328,7 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
   }
 
   override def loadPartition(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       loadPath: String,
       partition: TablePartitionSpec,
       isOverwrite: Boolean,
@@ -330,10 +343,11 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
   // --------------------------------------------------------------------------
 
   override def createPartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       parts: Seq[CatalogTablePartition],
       ignoreIfExists: Boolean): Unit = synchronized {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     requireTableExists(db, table)
     val existingParts = catalog(db).tables(table).partitions
     if (!ignoreIfExists) {
@@ -344,7 +358,7 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
     }
 
     val tableDir = new Path(catalog(db).db.locationUri, table)
-    val partitionColumnNames = getTable(db, table).partitionColumnNames
+    val partitionColumnNames = getTable(TableIdentifier(table, Some(db))).partitionColumnNames
     // TODO: we should follow hive to roll back if one partition path failed to create.
     parts.foreach { p =>
       // If location is set, the partition is using an external partition location and we don't
@@ -366,10 +380,11 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
   }
 
   override def dropPartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       partSpecs: Seq[TablePartitionSpec],
       ignoreIfNotExists: Boolean): Unit = synchronized {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     requireTableExists(db, table)
     val existingParts = catalog(db).tables(table).partitions
     if (!ignoreIfNotExists) {
@@ -380,7 +395,7 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
     }
 
     val tableDir = new Path(catalog(db).db.locationUri, table)
-    val partitionColumnNames = getTable(db, table).partitionColumnNames
+    val partitionColumnNames = getTable(TableIdentifier(table, Some(db))).partitionColumnNames
     // TODO: we should follow hive to roll back if one partition path failed to delete.
     partSpecs.foreach { p =>
       // If location is set, the partition is using an external partition location and we don't
@@ -402,19 +417,20 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
   }
 
   override def renamePartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       specs: Seq[TablePartitionSpec],
       newSpecs: Seq[TablePartitionSpec]): Unit = synchronized {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     require(specs.size == newSpecs.size, "number of old and new partition specs differ")
     requirePartitionsExist(db, table, specs)
     requirePartitionsNotExist(db, table, newSpecs)
 
     val tableDir = new Path(catalog(db).db.locationUri, table)
-    val partitionColumnNames = getTable(db, table).partitionColumnNames
+    val partitionColumnNames = getTable(TableIdentifier(table, Some(db))).partitionColumnNames
     // TODO: we should follow hive to roll back if one partition path failed to rename.
     specs.zip(newSpecs).foreach { case (oldSpec, newSpec) =>
-      val newPart = getPartition(db, table, oldSpec).copy(spec = newSpec)
+      val newPart = getPartition(TableIdentifier(table, Some(db)), oldSpec).copy(spec = newSpec)
       val existingParts = catalog(db).tables(table).partitions
 
       // If location is set, the partition is using an external partition location and we don't
@@ -441,9 +457,10 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
   }
 
   override def alterPartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       parts: Seq[CatalogTablePartition]): Unit = synchronized {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     requirePartitionsExist(db, table, parts.map(p => p.spec))
     parts.foreach { p =>
       catalog(db).tables(table).partitions.put(p.spec, p)
@@ -451,17 +468,19 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
   }
 
   override def getPartition(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       spec: TablePartitionSpec): CatalogTablePartition = synchronized {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     requirePartitionsExist(db, table, Seq(spec))
     catalog(db).tables(table).partitions(spec)
   }
 
   override def listPartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       partialSpec: Option[TablePartitionSpec] = None): Seq[CatalogTablePartition] = synchronized {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     requireTableExists(db, table)
     if (partialSpec.nonEmpty) {
       throw new UnsupportedOperationException(

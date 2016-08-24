@@ -117,7 +117,7 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
   }
 
   private def requireTableExists(db: String, table: String): Unit = {
-    withClient { getTable(db, table) }
+    withClient { getTable(TableIdentifier(table, Some(db))) }
   }
 
   // --------------------------------------------------------------------------
@@ -178,9 +178,9 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
   // --------------------------------------------------------------------------
 
   override def createTable(
-      db: String,
       tableDefinition: CatalogTable,
       ignoreIfExists: Boolean): Unit = withClient {
+    val db = tableDefinition.identifier.database.getOrElse("")
     requireDbExists(db)
     requireDbMatches(db, tableDefinition)
 
@@ -221,14 +221,17 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
   }
 
   override def dropTable(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       ignoreIfNotExists: Boolean): Unit = withClient {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     requireDbExists(db)
     client.dropTable(db, table, ignoreIfNotExists)
   }
 
-  override def renameTable(db: String, oldName: String, newName: String): Unit = withClient {
+  override def renameTable(tableIdentifier: TableIdentifier, newName: String): Unit = withClient {
+    val db = tableIdentifier.database.getOrElse("")
+    val oldName = tableIdentifier.table
     val newTable = client.getTable(db, oldName)
       .copy(identifier = TableIdentifier(newName, Some(db)))
     client.alterTable(oldName, newTable)
@@ -241,21 +244,28 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
    * Note: As of now, this only supports altering table properties, serde properties,
    * and num buckets!
    */
-  override def alterTable(db: String, tableDefinition: CatalogTable): Unit = withClient {
+  override def alterTable(tableDefinition: CatalogTable): Unit = withClient {
+    val db = tableDefinition.identifier.database.getOrElse("")
     requireDbMatches(db, tableDefinition)
     requireTableExists(db, tableDefinition.identifier.table)
     client.alterTable(tableDefinition)
   }
 
-  override def getTable(db: String, table: String): CatalogTable = withClient {
+  override def getTable(tableIdentifier: TableIdentifier): CatalogTable = withClient {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     client.getTable(db, table)
   }
 
-  override def getTableOption(db: String, table: String): Option[CatalogTable] = withClient {
+  override def getTableOption(tableIdentifier: TableIdentifier): Option[CatalogTable] = withClient {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     client.getTableOption(db, table)
   }
 
-  override def tableExists(db: String, table: String): Boolean = withClient {
+  override def tableExists(tableIdentifier: TableIdentifier): Boolean = withClient {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     client.getTableOption(db, table).isDefined
   }
 
@@ -270,11 +280,12 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
   }
 
   override def loadTable(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       loadPath: String,
       isOverwrite: Boolean,
       holdDDLTime: Boolean): Unit = withClient {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     requireTableExists(db, table)
     client.loadTable(
       loadPath,
@@ -284,18 +295,19 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
   }
 
   override def loadPartition(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       loadPath: String,
       partition: TablePartitionSpec,
       isOverwrite: Boolean,
       holdDDLTime: Boolean,
       inheritTableSpecs: Boolean,
       isSkewedStoreAsSubdir: Boolean): Unit = withClient {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     requireTableExists(db, table)
 
     val orderedPartitionSpec = new util.LinkedHashMap[String, String]()
-    getTable(db, table).partitionColumnNames.foreach { colName =>
+    getTable(TableIdentifier(table, Some(db))).partitionColumnNames.foreach { colName =>
       orderedPartitionSpec.put(colName, partition(colName))
     }
 
@@ -314,42 +326,47 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
   // --------------------------------------------------------------------------
 
   override def createPartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       parts: Seq[CatalogTablePartition],
       ignoreIfExists: Boolean): Unit = withClient {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     requireTableExists(db, table)
     client.createPartitions(db, table, parts, ignoreIfExists)
   }
 
   override def dropPartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       parts: Seq[TablePartitionSpec],
       ignoreIfNotExists: Boolean): Unit = withClient {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     requireTableExists(db, table)
     client.dropPartitions(db, table, parts, ignoreIfNotExists)
   }
 
   override def renamePartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       specs: Seq[TablePartitionSpec],
       newSpecs: Seq[TablePartitionSpec]): Unit = withClient {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     client.renamePartitions(db, table, specs, newSpecs)
   }
 
   override def alterPartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       newParts: Seq[CatalogTablePartition]): Unit = withClient {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     client.alterPartitions(db, table, newParts)
   }
 
   override def getPartition(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       spec: TablePartitionSpec): CatalogTablePartition = withClient {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     client.getPartition(db, table, spec)
   }
 
@@ -357,9 +374,10 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
    * Returns the partition names from hive metastore for a given table in a database.
    */
   override def listPartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       partialSpec: Option[TablePartitionSpec] = None): Seq[CatalogTablePartition] = withClient {
+    val db = tableIdentifier.database.getOrElse("")
+    val table = tableIdentifier.table
     client.getPartitions(db, table, partialSpec)
   }
 

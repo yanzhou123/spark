@@ -218,7 +218,7 @@ abstract class DataSourceSessionCatalog(
     val table = formatTableName(tableDefinition.identifier.table)
     val newTableDefinition = tableDefinition.copy(identifier = TableIdentifier(table, Some(db)))
     requireDbExists(db)
-    externalCatalog.createTable(db, newTableDefinition, ignoreIfExists)
+    externalCatalog.createTable(newTableDefinition, ignoreIfExists)
   }
 
   /**
@@ -237,7 +237,7 @@ abstract class DataSourceSessionCatalog(
     val newTableDefinition = tableDefinition.copy(identifier = tableIdentifier)
     requireDbExists(db)
     requireTableExists(tableIdentifier)
-    externalCatalog.alterTable(db, newTableDefinition)
+    externalCatalog.alterTable(newTableDefinition)
   }
 
   /**
@@ -267,7 +267,7 @@ abstract class DataSourceSessionCatalog(
     } else {
       requireDbExists(db)
       requireTableExists(TableIdentifier(table, Some(db)))
-      externalCatalog.getTable(db, table)
+      externalCatalog.getTable(TableIdentifier(table, Some(db)))
     }
   }
 
@@ -280,7 +280,7 @@ abstract class DataSourceSessionCatalog(
     val db = formatDatabaseName(name.database.getOrElse(getCurrentDatabase))
     val table = formatTableName(name.table)
     requireDbExists(db)
-    externalCatalog.getTableOption(db, table)
+    externalCatalog.getTableOption(TableIdentifier(table, Some(db)))
   }
 
   /**
@@ -297,7 +297,7 @@ abstract class DataSourceSessionCatalog(
     val table = formatTableName(name.table)
     requireDbExists(db)
     requireTableExists(TableIdentifier(table, Some(db)))
-    externalCatalog.loadTable(db, table, loadPath, isOverwrite, holdDDLTime)
+    externalCatalog.loadTable(TableIdentifier(table, Some(db)), loadPath, isOverwrite, holdDDLTime)
   }
 
   /**
@@ -317,7 +317,8 @@ abstract class DataSourceSessionCatalog(
     val table = formatTableName(name.table)
     requireDbExists(db)
     requireTableExists(TableIdentifier(table, Some(db)))
-    externalCatalog.loadPartition(db, table, loadPath, partition, isOverwrite, holdDDLTime,
+    externalCatalog.loadPartition(TableIdentifier(table, Some(db)),
+      loadPath, partition, isOverwrite, holdDDLTime,
       inheritTableSpecs, isSkewedStoreAsSubdir)
   }
 
@@ -354,7 +355,7 @@ abstract class DataSourceSessionCatalog(
     if (oldName.database.isDefined || !tempTables.contains(oldTableName)) {
       requireTableExists(TableIdentifier(oldTableName, Some(db)))
       requireTableNotExists(TableIdentifier(newTableName, Some(db)))
-      externalCatalog.renameTable(db, oldTableName, newTableName)
+      externalCatalog.renameTable(TableIdentifier(oldTableName, Some(db)), newTableName)
     } else {
       if (newName.database.isDefined) {
         throw new AnalysisException(
@@ -386,7 +387,7 @@ abstract class DataSourceSessionCatalog(
       // When ignoreIfNotExists is false, no exception is issued when the table does not exist.
       // Instead, log it as an error message.
       if (tableExists(TableIdentifier(table, Option(db)))) {
-        externalCatalog.dropTable(db, table, ignoreIfNotExists = true)
+        externalCatalog.dropTable(TableIdentifier(table, Some(db)), ignoreIfNotExists = true)
       } else if (!ignoreIfNotExists) {
         throw new NoSuchTableException(db = db, table = table)
       }
@@ -408,7 +409,7 @@ abstract class DataSourceSessionCatalog(
       val table = formatTableName(name.table)
       val relation =
         if (name.database.isDefined || !tempTables.contains(table)) {
-          val metadata = externalCatalog.getTable(db, table)
+          val metadata = externalCatalog.getTable(TableIdentifier(table, Some(db)))
           SimpleCatalogRelation(db, metadata, alias)
         } else {
           tempTables(table)
@@ -434,7 +435,7 @@ abstract class DataSourceSessionCatalog(
     if (isTemporaryTable(name)) {
       true
     } else {
-      externalCatalog.tableExists(db, table)
+      externalCatalog.tableExists(TableIdentifier(table, Some(db)))
     }
   }
 
@@ -503,7 +504,7 @@ abstract class DataSourceSessionCatalog(
     val table = formatTableName(tableName.table)
     requireDbExists(db)
     requireTableExists(TableIdentifier(table, Option(db)))
-    externalCatalog.createPartitions(db, table, parts, ignoreIfExists)
+    externalCatalog.createPartitions(TableIdentifier(table, Some(db)), parts, ignoreIfExists)
   }
 
   /**
@@ -519,7 +520,7 @@ abstract class DataSourceSessionCatalog(
     val table = formatTableName(tableName.table)
     requireDbExists(db)
     requireTableExists(TableIdentifier(table, Option(db)))
-    externalCatalog.dropPartitions(db, table, specs, ignoreIfNotExists)
+    externalCatalog.dropPartitions(TableIdentifier(table, Some(db)), specs, ignoreIfNotExists)
   }
 
   /**
@@ -539,7 +540,7 @@ abstract class DataSourceSessionCatalog(
     val table = formatTableName(tableName.table)
     requireDbExists(db)
     requireTableExists(TableIdentifier(table, Option(db)))
-    externalCatalog.renamePartitions(db, table, specs, newSpecs)
+    externalCatalog.renamePartitions(TableIdentifier(table, Some(db)), specs, newSpecs)
   }
 
   /**
@@ -557,7 +558,7 @@ abstract class DataSourceSessionCatalog(
     val table = formatTableName(tableName.table)
     requireDbExists(db)
     requireTableExists(TableIdentifier(table, Option(db)))
-    externalCatalog.alterPartitions(db, table, parts)
+    externalCatalog.alterPartitions(TableIdentifier(table, Some(db)), parts)
   }
 
   /**
@@ -570,7 +571,7 @@ abstract class DataSourceSessionCatalog(
     val table = formatTableName(tableName.table)
     requireDbExists(db)
     requireTableExists(TableIdentifier(table, Option(db)))
-    externalCatalog.getPartition(db, table, spec)
+    externalCatalog.getPartition(TableIdentifier(table, Some(db)), spec)
   }
 
   /**
@@ -587,7 +588,7 @@ abstract class DataSourceSessionCatalog(
     val table = formatTableName(tableName.table)
     requireDbExists(db)
     requireTableExists(TableIdentifier(table, Option(db)))
-    externalCatalog.listPartitions(db, table, partialSpec)
+    externalCatalog.listPartitions(TableIdentifier(table, Some(db)), partialSpec)
   }
 
   /**

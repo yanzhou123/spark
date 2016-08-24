@@ -31,9 +31,9 @@ sealed trait IdentifierWithDatabase {
 
   def quotedString: String = {
     if (dataSource.isDefined) {
-        s"`${database.get}`.`${database.get}`.`$identifier`"
+        s"`${dataSource.getOrElse("")}`.`${database.getOrElse("")}`.`$identifier`"
     } else if (database.isDefined) {
-      s"`${database.get}`.`$identifier`"
+      s"`${database.getOrElse("")}`.`$identifier`"
     } else {
       s"`$identifier`"
     }
@@ -41,9 +41,9 @@ sealed trait IdentifierWithDatabase {
 
   def unquotedString: String = {
     if (dataSource.isDefined) {
-      s"${database.get}.${database.get}.$identifier"
+      s"${dataSource.getOrElse("")}.${database.getOrElse("")}.$identifier"
     } else if (database.isDefined) {
-      s"${database.get}.$identifier"
+      s"${database.getOrElse("")}.$identifier"
     } else {
       s"$identifier"
     }
@@ -61,7 +61,7 @@ sealed trait IdentifierWithDatabase {
  */
 case class TableIdentifier(
     table: String,
-    database: Option[String],
+    database: Option[String] = None,
     dataSource: Option[String] = None)
   extends IdentifierWithDatabase {
 

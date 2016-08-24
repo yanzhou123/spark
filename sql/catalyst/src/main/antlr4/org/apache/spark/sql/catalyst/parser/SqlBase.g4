@@ -442,7 +442,8 @@ rowFormat
     ;
 
 tableIdentifier
-    : (db=identifier '.')? table=identifier
+    : ((datasource=identifier '.')? db=identifier '.')? table=identifier
+    | datasource=identifier '.' '.' table=identifier
     ;
 
 namedExpression

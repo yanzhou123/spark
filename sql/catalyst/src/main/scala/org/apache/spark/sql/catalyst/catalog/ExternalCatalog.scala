@@ -20,6 +20,7 @@ package org.apache.spark.sql.catalyst.catalog
 import scala.collection.mutable
 
 import org.apache.spark.sql.catalyst.analysis.NoSuchDatabaseException
+import org.apache.spark.sql.catalyst.TableIdentifier
 
 /**
  * Interface for the system catalog (of columns, partitions, tables, and databases).
@@ -87,11 +88,11 @@ abstract class ExternalCatalog {
   // Tables
   // --------------------------------------------------------------------------
 
-  def createTable(db: String, tableDefinition: CatalogTable, ignoreIfExists: Boolean): Unit
+  def createTable(tableDefinition: CatalogTable, ignoreIfExists: Boolean): Unit
 
-  def dropTable(db: String, table: String, ignoreIfNotExists: Boolean): Unit
+  def dropTable(tableIdentifier: TableIdentifier, ignoreIfNotExists: Boolean): Unit
 
-  def renameTable(db: String, oldName: String, newName: String): Unit
+  def renameTable(tableIdentifier: TableIdentifier, newName: String): Unit
 
   /**
    * Alter a table whose name that matches the one specified in `tableDefinition`,
@@ -100,28 +101,26 @@ abstract class ExternalCatalog {
    * Note: If the underlying implementation does not support altering a certain field,
    * this becomes a no-op.
    */
-  def alterTable(db: String, tableDefinition: CatalogTable): Unit
+  def alterTable(tableDefinition: CatalogTable): Unit
 
-  def getTable(db: String, table: String): CatalogTable
+  def getTable(tableIdentifier: TableIdentifier): CatalogTable
 
-  def getTableOption(db: String, table: String): Option[CatalogTable]
+  def getTableOption(tableIdentifier: TableIdentifier): Option[CatalogTable]
 
-  def tableExists(db: String, table: String): Boolean
+  def tableExists(tableIdentifier: TableIdentifier): Boolean
 
   def listTables(db: String): Seq[String]
 
   def listTables(db: String, pattern: String): Seq[String]
 
   def loadTable(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       loadPath: String,
       isOverwrite: Boolean,
       holdDDLTime: Boolean): Unit
 
   def loadPartition(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       loadPath: String,
       partition: TablePartitionSpec,
       isOverwrite: Boolean,
@@ -134,14 +133,12 @@ abstract class ExternalCatalog {
   // --------------------------------------------------------------------------
 
   def createPartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       parts: Seq[CatalogTablePartition],
       ignoreIfExists: Boolean): Unit
 
   def dropPartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       parts: Seq[TablePartitionSpec],
       ignoreIfNotExists: Boolean): Unit
 
@@ -150,8 +147,7 @@ abstract class ExternalCatalog {
    * This assumes index i of `specs` corresponds to index i of `newSpecs`.
    */
   def renamePartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       specs: Seq[TablePartitionSpec],
       newSpecs: Seq[TablePartitionSpec]): Unit
 
@@ -163,11 +159,11 @@ abstract class ExternalCatalog {
    * this becomes a no-op.
    */
   def alterPartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       parts: Seq[CatalogTablePartition]): Unit
 
-  def getPartition(db: String, table: String, spec: TablePartitionSpec): CatalogTablePartition
+  def getPartition(tableIdentifier: TableIdentifier,
+                   spec: TablePartitionSpec): CatalogTablePartition
 
   /**
    * List the metadata of all partitions that belong to the specified table, assuming it exists.
@@ -180,8 +176,7 @@ abstract class ExternalCatalog {
    * @param partialSpec  partition spec
    */
   def listPartitions(
-      db: String,
-      table: String,
+      tableIdentifier: TableIdentifier,
       partialSpec: Option[TablePartitionSpec] = None): Seq[CatalogTablePartition]
 
   // --------------------------------------------------------------------------
