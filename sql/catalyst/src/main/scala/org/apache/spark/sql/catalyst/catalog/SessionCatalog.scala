@@ -48,10 +48,12 @@ object SessionCatalog {
 class SessionCatalog(
     private[sql] val sparkSession: Any,
     val internalCatalog: InternalCatalog,
-    private[catalyst] val functionResourceLoader: FunctionResourceLoader,
-    private[catalyst] val functionRegistry: FunctionRegistry,
-    private[catalyst] val conf: CatalystConf,
+    private[sql] val functionResourceLoader: FunctionResourceLoader,
+    private[sql] val functionRegistry: FunctionRegistry,
+    private[sql] val conf: CatalystConf,
     private[sql] val hadoopConf: Configuration) extends Logging {
+  self =>
+
   import SessionCatalog._
   import CatalogTypes.TablePartitionSpec
 
@@ -606,8 +608,7 @@ class SessionCatalog(
    * This performs reflection to decide what type of [[Expression]] to return in the builder.
    */
   private[sql] def makeFunctionBuilder(name: String, functionClassName: String): FunctionBuilder = {
-    // TODO: at least support UDAFs here
-    throw new UnsupportedOperationException("Use sqlContext.udf.register(...) instead.")
+    internalCatalog.makeFunctionBuilder(this, currentDataSource, name, functionClassName)
   }
 
   /**

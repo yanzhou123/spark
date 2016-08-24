@@ -453,7 +453,7 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
   test("Caching converted data source Parquet Relations") {
     def checkCached(tableIdentifier: TableIdentifier): Unit = {
       // Converted test_parquet should be cached.
-      sessionState.catalog.getDataSourceSessionCatalog("hive").externalCatalog
+      sessionState.catalog.getDataSourceSessionCatalog("hive")
         .asInstanceOf[HiveSessionCatalog].getCachedDataSourceTable(tableIdentifier) match {
         case null => fail("Converted test_parquet should be cached in the cache.")
         case logical @ LogicalRelation(parquetRelation: HadoopFsRelation, _, _) => // OK
@@ -481,7 +481,7 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
 
     var tableIdentifier = TableIdentifier("test_insert_parquet", Some("default"))
     val hiveSessionCatalog = sessionState.catalog.getDataSourceSessionCatalog("hive")
-      .externalCatalog.asInstanceOf[HiveSessionCatalog]
+      .asInstanceOf[HiveSessionCatalog]
 
     // First, make sure the converted test_parquet is not cached.
     assert(hiveSessionCatalog.getCachedDataSourceTable(tableIdentifier) === null)

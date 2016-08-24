@@ -428,7 +428,8 @@ private[hive] class TestHiveSparkSession(
       sharedState.cacheManager.clearCache()
       loadedTables.clear()
       sessionState.catalog.clearTempTables()
-      sessionState.catalog.asInstanceOf[HiveSessionCatalog].invalidateCache()
+      sessionState.catalog.getDataSourceSessionCatalog("hive")
+        .asInstanceOf[HiveSessionCatalog].invalidateCache()
 
       val client = sessionState.catalog.getDataSourceSessionCatalog("hive")
         .asInstanceOf[HiveSessionCatalog].client

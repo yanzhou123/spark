@@ -46,10 +46,8 @@ import org.apache.spark.sql.types._
 private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Logging {
   private lazy val sessionState = sparkSession.sessionState
   private lazy val catalog = sparkSession.sharedState.internalCatalog
-    .getDataSourceCatalog("hive").asInstanceOf[HiveExternalCatalog]
+    .getDataSourceCatalog("hive").get.asInstanceOf[HiveExternalCatalog]
   private val client = catalog.client
-  private val sessionCatalog = sparkSession.sharedState.internalCatalog
-      .getSessionCatalog("hive", sessionState.catalog).asInstanceOf[HiveSessionCatalog]
 
   /** A fully qualified identifier for a table (i.e., database.tableName) */
   case class QualifiedTableName(database: String, name: String)
@@ -359,6 +357,8 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Log
    */
   object ParquetConversions extends Rule[LogicalPlan] {
     private def shouldConvertMetastoreParquet(relation: MetastoreRelation): Boolean = {
+      val sessionCatalog = sparkSession.sharedState.internalCatalog
+        .getSessionCatalog("hive", sessionState.catalog).asInstanceOf[HiveSessionCatalog]
       relation.tableDesc.getSerdeClassName.toLowerCase.contains("parquet") &&
         sessionCatalog.convertMetastoreParquet
     }
@@ -366,6 +366,8 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Log
     private def convertToParquetRelation(relation: MetastoreRelation): LogicalRelation = {
       val defaultSource = new ParquetFileFormat()
       val fileFormatClass = classOf[ParquetFileFormat]
+      val sessionCatalog = sparkSession.sharedState.internalCatalog
+        .getSessionCatalog("hive", sessionState.catalog).asInstanceOf[HiveSessionCatalog]
 
       val mergeSchema = sessionCatalog.convertMetastoreParquetWithSchemaMerging
       val options = Map(ParquetOptions.MERGE_SCHEMA -> mergeSchema.toString)
@@ -405,6 +407,8 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Log
    */
   object OrcConversions extends Rule[LogicalPlan] {
     private def shouldConvertMetastoreOrc(relation: MetastoreRelation): Boolean = {
+      val sessionCatalog = sparkSession.sharedState.internalCatalog
+        .getSessionCatalog("hive", sessionState.catalog).asInstanceOf[HiveSessionCatalog]
       relation.tableDesc.getSerdeClassName.toLowerCase.contains("orc") &&
         sessionCatalog.convertMetastoreOrc
     }

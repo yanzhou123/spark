@@ -26,6 +26,7 @@ import scala.util.control.NonFatal
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis._
+import org.apache.spark.sql.catalyst.analysis.FunctionRegistry.FunctionBuilder
 import org.apache.spark.sql.catalyst.expressions.{Expression, ExpressionInfo}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.util.Utils
@@ -369,6 +370,11 @@ class InternalCatalog extends Serializable {
   def functionExists(sessionCatalog: SessionCatalog, dataSource: String,
                      name: FunctionIdentifier): Boolean = {
     getSessionCatalog(dataSource, sessionCatalog).functionExists(name)
+  }
+
+  def makeFunctionBuilder(sessionCatalog: SessionCatalog, dataSource: String,
+                          name: String, functionClassName: String): FunctionBuilder = {
+    getSessionCatalog(dataSource, sessionCatalog).makeFunctionBuilder(name, functionClassName)
   }
 
   def lookupFunction(sessionCatalog: SessionCatalog, dataSource: String,

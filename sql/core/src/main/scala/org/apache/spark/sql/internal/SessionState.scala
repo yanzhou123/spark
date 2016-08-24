@@ -127,9 +127,11 @@ private[sql] class SessionState(sparkSession: SparkSession) {
 
   private def registerHiveCatalog() = {
     val HIVE_EXTERNAL_CATALOG_CLASS_NAME = "org.apache.spark.sql.hive.HiveExternalCatalog"
-    val externalCatalog =
-    catalog.internalCatalog.registerDataSource("hive", HIVE_EXTERNAL_CATALOG_CLASS_NAME,
-      Map[String, String](), sparkSession.sparkContext)
+    // TODO: make the check-and-put atomic
+    if (!catalog.internalCatalog.dsExists("hive")) {
+      catalog.internalCatalog.registerDataSource("hive", HIVE_EXTERNAL_CATALOG_CLASS_NAME,
+        Map[String, String](), sparkSession.sparkContext)
+    }
     catalog.currentDataSource = "hive"
   }
 
@@ -138,9 +140,6 @@ private[sql] class SessionState(sparkSession: SparkSession) {
     case SessionCatalog.DEFAULT_DATASOURCE => registerDefaultCatalog
     case "hive" => registerHiveCatalog()
   }
-  // the current db has to be created after the data source registration
-  catalog.createDatabase(CatalogDatabase(SessionCatalog.DEFAULT_DATABASE,
-    "default database", conf.warehousePath, Map()), ignoreIfExists = true)
 
   /**
    * Interface exposed to the user for registering user-defined functions.
@@ -148,7 +147,10 @@ private[sql] class SessionState(sparkSession: SparkSession) {
    */
   lazy val udf: UDFRegistration = new UDFRegistration(functionRegistry)
 
-  private def sessionCatalogs = catalog.internalCatalog.getSessionCatalogs(sparkSession)
+  private def sessionCatalogs = {
+    catalog.internalCatalog.getSessionCatalog(catalog.currentDataSource, catalog)
+    catalog.internalCatalog.getSessionCatalogs(sparkSession)
+  }
 
   // helper to combine children rules
   private def combine[T](sss: Seq[DataSourceSessionCatalog],

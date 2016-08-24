@@ -908,7 +908,6 @@ object SparkSession {
   // TODO: Identical to the two defined in SQLSessionState;
   // to be consolidated/moved/removed
   private val HIVE_EXTERNAL_CATALOG_CLASS_NAME = "org.apache.spark.sql.hive.HiveExternalCatalog"
-  private val HIVE_SESSION_STATE_CLASS_NAME = "org.apache.spark.sql.hive.HiveSessionState"
 
   /**
    * Return true if Hive classes can be loaded, otherwise false.
@@ -916,7 +915,6 @@ object SparkSession {
   private[spark] def hiveClassesArePresent: Boolean = {
     try {
       Utils.classForName(HIVE_EXTERNAL_CATALOG_CLASS_NAME)
-      Utils.classForName(HIVE_SESSION_STATE_CLASS_NAME)
       Utils.classForName("org.apache.hadoop.hive.conf.HiveConf")
       true
     } catch {
