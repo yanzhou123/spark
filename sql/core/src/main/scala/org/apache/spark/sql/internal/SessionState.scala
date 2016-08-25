@@ -103,24 +103,28 @@ private[sql] class SessionState(sparkSession: SparkSession) {
     newHadoopConf())
 
   private def registerDefaultCatalog() = {
-    val externalCatalog = new InMemoryCatalog(sparkSession.sparkContext.hadoopConfiguration)
-    val sessionCatalog = new DataSourceSessionCatalog(catalog, externalCatalog,
-      functionResourceLoader, functionRegistry, conf, catalog.hadoopConf) {
+    val externalCatalog = new InMemoryCatalog(sparkSession.sparkContext.hadoopConfiguration) {
+      override def getSessionCatalog(sessionCatalog: SessionCatalog) = {
+        new DataSourceSessionCatalog(sessionCatalog, this,
+          functionResourceLoader, functionRegistry, conf, catalog.hadoopConf) {
 
-      override val analyzer: Analyzer = new Analyzer(catalog, conf) {
-        override val extendedResolutionRules = Nil
-        override val extendedCheckRules = Nil
-      }
+          override val analyzer: Analyzer = new Analyzer(catalog, conf) {
+            override val extendedResolutionRules = Nil
+            override val extendedCheckRules = Nil
+          }
 
-      override val optimizer: Optimizer = new SparkOptimizer(catalog, conf, new ExperimentalMethods)
-      {
-        override def batches = Nil
-      }
+          override val optimizer: Optimizer = new SparkOptimizer(catalog,
+            conf, new ExperimentalMethods) {
+            override def batches = Nil
+          }
 
-      override def planner: Any = new SparkPlanner(self.sparkSession.sparkContext, conf, Nil) {
-        override def strategies: Seq[Strategy] = Nil
+          override def planner: Any = new SparkPlanner(self.sparkSession.sparkContext, conf, Nil) {
+            override def strategies: Seq[Strategy] = Nil
+          }
+        }
       }
     }
+    val sessionCatalog = externalCatalog.getSessionCatalog(catalog)
     catalog.internalCatalog.registerDataSource(SessionCatalog.DEFAULT_DATASOURCE, sessionCatalog)
     synchronized {
       catalog.currentDataSource = SessionCatalog.DEFAULT_DATASOURCE
