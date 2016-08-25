@@ -43,7 +43,7 @@ import org.apache.spark.sql.types._
  */
 object SimpleAnalyzer extends Analyzer(
     new SessionCatalog(
-      new InternalCatalog(new InMemoryCatalog),
+      new InMemoryCatalog,
       EmptyFunctionRegistry,
       new SimpleCatalystConf(caseSensitiveAnalysis = true)) {
       override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean) {}

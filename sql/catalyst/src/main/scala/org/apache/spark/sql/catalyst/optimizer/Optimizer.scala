@@ -141,7 +141,7 @@ object SimpleTestOptimizer extends SimpleTestOptimizer
 
 class SimpleTestOptimizer extends Optimizer(
   new SessionCatalog(
-    new InternalCatalog(new InMemoryCatalog),
+    new InMemoryCatalog,
     EmptyFunctionRegistry,
     new SimpleCatalystConf(caseSensitiveAnalysis = true)),
   new SimpleCatalystConf(caseSensitiveAnalysis = true))

@@ -29,8 +29,7 @@ import org.apache.spark.sql.catalyst.rules.RuleExecutor
 
 class AggregateOptimizeSuite extends PlanTest {
   val conf = new SimpleCatalystConf(caseSensitiveAnalysis = false)
-  val catalog = new SessionCatalog(new InternalCatalog(new InMemoryCatalog),
-    EmptyFunctionRegistry, conf)
+  val catalog = new SessionCatalog(new InMemoryCatalog, EmptyFunctionRegistry, conf)
   val analyzer = new Analyzer(catalog, conf)
 
   object Optimize extends RuleExecutor[LogicalPlan] {

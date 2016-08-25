@@ -71,13 +71,40 @@ class SessionCatalog(
       new Configuration())
   }
 
+  def this(
+            externalCatalog: ExternalCatalog,
+            functionRegistry: FunctionRegistry,
+            conf: CatalystConf) {
+    this(
+      None,
+      new InternalCatalog(externalCatalog),
+      DummyFunctionResourceLoader,
+      functionRegistry,
+      conf,
+      new Configuration())
+  }
+
+
   def this( sparkSession: Any,
-            internalCatalog: InternalCatalog,
+    internalCatalog: InternalCatalog,
+    functionRegistry: FunctionRegistry,
+    conf: CatalystConf) {
+    this(
+      sparkSession,
+      internalCatalog,
+      DummyFunctionResourceLoader,
+      functionRegistry,
+      conf,
+      new Configuration())
+  }
+
+  def this( sparkSession: Any,
+            externalCatalog: ExternalCatalog,
             functionRegistry: FunctionRegistry,
             conf: CatalystConf) {
     this(
       sparkSession,
-      internalCatalog,
+      new InternalCatalog(externalCatalog),
       DummyFunctionResourceLoader,
       functionRegistry,
       conf,
@@ -91,6 +118,10 @@ class SessionCatalog(
 
   def this(internalCatalog: InternalCatalog) {
     this(None, internalCatalog)
+  }
+
+  def this(externalCatalog: ExternalCatalog) {
+    this(new InternalCatalog(externalCatalog))
   }
 
   /** List of temporary tables, mapping from table name to their logical plan. */

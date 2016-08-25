@@ -114,11 +114,12 @@ private[sql] class SessionState(sparkSession: SparkSession) {
           }
 
           override val optimizer: Optimizer = new SparkOptimizer(catalog,
-            conf, new ExperimentalMethods) {
+            self.conf, new ExperimentalMethods) {
             override def batches = Nil
           }
 
-          override def planner: Any = new SparkPlanner(self.sparkSession.sparkContext, conf, Nil) {
+          override def planner: Any = new SparkPlanner(self.sparkSession.sparkContext,
+            self.conf, Nil) {
             override def strategies: Seq[Strategy] = Nil
           }
         }

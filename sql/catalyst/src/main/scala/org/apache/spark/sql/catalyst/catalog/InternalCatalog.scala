@@ -24,11 +24,7 @@ import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis._
-import org.apache.spark.sql.catalyst.analysis.FunctionRegistry.FunctionBuilder
-import org.apache.spark.sql.catalyst.expressions.{Expression, ExpressionInfo}
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.util.Utils
 
 /**
@@ -44,8 +40,6 @@ import org.apache.spark.util.Utils
  */
 class InternalCatalog extends Serializable {
 
-  import CatalogTypes.TablePartitionSpec
-
   // for persistent purpose later
   var dirty = false
 
@@ -55,7 +49,7 @@ class InternalCatalog extends Serializable {
   }
 
   def this(externalCatalog: ExternalCatalog) = {
-    this(SessionCatalog.DEFAULT_DATASOURCE, externalCatalog)
+    this(externalCatalog.name, externalCatalog)
   }
 
   // TODO: use Guava Cache??
@@ -99,7 +93,7 @@ class InternalCatalog extends Serializable {
 
   def registerDataSource(name: String, sessionCatalog: DataSourceSessionCatalog): Unit = {
     externalCatalogMap.getOrElseUpdate(name, sessionCatalog.externalCatalog)
-    val sparkSession = sessionCatalog.sessionCatalog.sparkSession
+    val sparkSession = sessionCatalog.parent.sparkSession
     var created = false
     sessionCatalogMap.getOrElseUpdate(sparkSession, {
       new ConcurrentHashMap[String, DataSourceSessionCatalog]().asScala
