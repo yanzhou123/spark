@@ -122,7 +122,10 @@ private[sql] class SessionState(sparkSession: SparkSession) {
       }
     }
     catalog.internalCatalog.registerDataSource(SessionCatalog.DEFAULT_DATASOURCE, sessionCatalog)
-    catalog.currentDataSource = SessionCatalog.DEFAULT_DATASOURCE
+    synchronized {
+      catalog.currentDataSource = SessionCatalog.DEFAULT_DATASOURCE
+      catalog._currentSessionCatalog = None
+    }
   }
 
   private def registerHiveCatalog() = {
@@ -132,7 +135,10 @@ private[sql] class SessionState(sparkSession: SparkSession) {
       catalog.internalCatalog.registerDataSource("hive", HIVE_EXTERNAL_CATALOG_CLASS_NAME,
         Map[String, String](), sparkSession.sparkContext)
     }
-    catalog.currentDataSource = "hive"
+    synchronized {
+      catalog.currentDataSource = "hive"
+      catalog._currentSessionCatalog = None
+    }
   }
 
   sparkSession.sparkContext.conf.get(CATALOG_IMPLEMENTATION.key,
@@ -148,7 +154,7 @@ private[sql] class SessionState(sparkSession: SparkSession) {
   lazy val udf: UDFRegistration = new UDFRegistration(functionRegistry)
 
   private def sessionCatalogs = {
-    catalog.internalCatalog.getSessionCatalog(catalog.currentDataSource, catalog)
+    synchronized{ catalog.setCurrentSessionCatalog() }
     catalog.internalCatalog.getSessionCatalogs(sparkSession)
   }
 

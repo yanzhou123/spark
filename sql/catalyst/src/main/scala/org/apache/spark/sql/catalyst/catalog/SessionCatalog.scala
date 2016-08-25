@@ -99,6 +99,15 @@ class SessionCatalog(
 
   private[sql] var currentDataSource: String = DEFAULT_DATASOURCE
 
+  private[sql] def currentSessionCatalog = {
+    _currentSessionCatalog.getOrElse {
+      setCurrentSessionCatalog()
+      _currentSessionCatalog.get
+    }
+  }
+
+  private[sql] var _currentSessionCatalog: Option[DataSourceSessionCatalog] = None
+
   /**
    * Format table name, taking into account case sensitivity.
    */
@@ -130,31 +139,12 @@ class SessionCatalog(
     fs.makeQualified(hadoopPath)
   }
 
-  private def requireDbExists(db: String): Unit = {
-    if (!databaseExists(db)) {
-      throw new NoSuchDatabaseException(db)
-    }
-  }
-
   private def requireDSExists(name: String): Unit = {
     if (!internalCatalog.dsExists(name)) {
       throw new NoSuchDataSourceException(name)
     }
   }
 
-  private def requireDataSourceExists(name: TableIdentifier): Unit = {
-    if (!tableExists(name)) {
-      val db = name.dataSource.getOrElse(currentDataSource)
-      throw new NoSuchTableException(db = db, table = name.table)
-    }
-  }
-
-  private def requireTableNotExists(name: TableIdentifier): Unit = {
-    if (tableExists(name)) {
-      val db = name.dataSource.getOrElse(currentDataSource)
-      throw new TableAlreadyExistsException(db = db, table = name.table)
-    }
-  }
   // ----------------------------------------------------------------------------
   // Databases
   // ----------------------------------------------------------------------------
@@ -162,46 +152,47 @@ class SessionCatalog(
   // ----------------------------------------------------------------------------
 
   def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = {
-    internalCatalog.createDatabase(this, currentDataSource, dbDefinition, ignoreIfExists)
+    currentSessionCatalog.createDatabase(dbDefinition, ignoreIfExists)
   }
 
   def dropDatabase(db: String, ignoreIfNotExists: Boolean, cascade: Boolean): Unit = {
-    internalCatalog.dropDatabase(this, currentDataSource, db, ignoreIfNotExists, cascade)
+    currentSessionCatalog.dropDatabase(db, ignoreIfNotExists, cascade)
   }
 
   def alterDatabase(dbDefinition: CatalogDatabase): Unit = {
-    internalCatalog.alterDatabase(this, currentDataSource, dbDefinition)
+    currentSessionCatalog.alterDatabase(dbDefinition)
   }
 
   def getDatabaseMetadata(db: String): CatalogDatabase = {
-    internalCatalog.getDatabaseMetadata(this, currentDataSource, db)
+    currentSessionCatalog.getDatabaseMetadata(db)
   }
 
   def databaseExists(db: String): Boolean = {
-    internalCatalog.databaseExists(this, currentDataSource, db)
+    currentSessionCatalog.databaseExists(db)
   }
 
   def listDatabases(): Seq[String] = {
-    internalCatalog.listDatabases(this, currentDataSource)
+    currentSessionCatalog.listDatabases()
   }
 
   def listDatabases(pattern: String): Seq[String] = {
-    internalCatalog.listDatabases(this, currentDataSource, pattern)
+    currentSessionCatalog.listDatabases(pattern)
   }
 
   def getCurrentDatabase: String = {
-    internalCatalog.getCurrentDatabase(this, currentDataSource)
+    currentSessionCatalog.getCurrentDatabase
   }
 
   def setCurrentDatabase(db: String): Unit = {
     // requireDbExists(dbName)
-    internalCatalog.setCurrentDatabase(this, currentDataSource, db)
+    currentSessionCatalog.setCurrentDatabase(db)
   }
 
   def setCurrentDataSource(name: String): Unit = {
     val dsName = formatDataSourceName(name)
     requireDSExists(dsName)
     synchronized { currentDataSource = dsName}
+    setCurrentSessionCatalog()
   }
 
   /**
@@ -232,7 +223,7 @@ class SessionCatalog(
    */
   def createTable(tableDefinition: CatalogTable, ignoreIfExists: Boolean): Unit = {
     // requireDbExists(db)
-    internalCatalog.createTable(this, currentDataSource, tableDefinition, ignoreIfExists)
+    currentSessionCatalog.createTable(tableDefinition, ignoreIfExists)
   }
 
   /**
@@ -246,7 +237,7 @@ class SessionCatalog(
    */
   def alterTable(tableDefinition: CatalogTable): Unit = {
     // requireDbExists(db)
-    internalCatalog.alterTable(this, currentDataSource, tableDefinition)
+    currentSessionCatalog.alterTable(tableDefinition)
   }
 
   /**
@@ -256,7 +247,7 @@ class SessionCatalog(
    */
   def getTableMetadata(name: TableIdentifier): CatalogTable = {
     // requireDbExists(db)
-    internalCatalog.getTableMetadata(this, currentDataSource, name)
+    currentSessionCatalog.getTableMetadata(name)
   }
 
   /**
@@ -266,7 +257,7 @@ class SessionCatalog(
    */
   def getTableMetadataOption(name: TableIdentifier): Option[CatalogTable] = {
     // requireDbExists(db)
-    internalCatalog.getTableMetadataOption(this, currentDataSource, name)
+    currentSessionCatalog.getTableMetadataOption(name)
   }
 
   /**
@@ -280,8 +271,7 @@ class SessionCatalog(
       isOverwrite: Boolean,
       holdDDLTime: Boolean): Unit = {
     // requireDbExists(db)
-    internalCatalog.loadTable(this, currentDataSource,
-      name, loadPath, isOverwrite, holdDDLTime)
+    currentSessionCatalog.loadTable(name, loadPath, isOverwrite, holdDDLTime)
   }
 
   /**
@@ -298,8 +288,7 @@ class SessionCatalog(
       inheritTableSpecs: Boolean,
       isSkewedStoreAsSubdir: Boolean): Unit = {
     // requireDbExists(db)
-    internalCatalog.loadPartition(this, currentDataSource, name, loadPath, partition,
-      isOverwrite, holdDDLTime,
+    currentSessionCatalog.loadPartition(name, loadPath, partition, isOverwrite, holdDDLTime,
       inheritTableSpecs, isSkewedStoreAsSubdir)
   }
 
@@ -338,7 +327,7 @@ class SessionCatalog(
    * This assumes the database specified in `oldName` matches the one specified in `newName`.
    */
   def renameTable(oldName: TableIdentifier, newName: TableIdentifier): Unit = synchronized {
-    internalCatalog.renameTable(this, currentDataSource, oldName, newName)
+    currentSessionCatalog.renameTable(oldName, newName)
   }
 
   /**
@@ -350,7 +339,7 @@ class SessionCatalog(
    */
   def dropTable(name: TableIdentifier, ignoreIfNotExists: Boolean): Unit = synchronized {
     //  requireDbExists(db)
-    internalCatalog.dropTable(this, currentDataSource, name, ignoreIfNotExists)
+    currentSessionCatalog.dropTable(name, ignoreIfNotExists)
   }
 
   /**
@@ -362,7 +351,7 @@ class SessionCatalog(
    */
   def lookupRelation(name: TableIdentifier, alias: Option[String] = None): LogicalPlan = {
     synchronized {
-      internalCatalog.lookupRelation(this, currentDataSource, name, alias)
+      currentSessionCatalog.lookupRelation(name, alias)
     }
   }
 
@@ -375,7 +364,7 @@ class SessionCatalog(
    * contain the table.
    */
   def tableExists(name: TableIdentifier): Boolean = synchronized {
-    internalCatalog.tableExists(this, currentDataSource, name)
+    currentSessionCatalog.tableExists(name)
   }
 
   /**
@@ -398,14 +387,14 @@ class SessionCatalog(
    */
   def listTables(db: String, pattern: String): Seq[TableIdentifier] = {
     // requireDbExists(dbName)
-    internalCatalog.listTables(this, currentDataSource, db, pattern)
+    currentSessionCatalog.listTables(db, pattern)
   }
 
   /**
    * Refresh the cache entry for a metastore table, if any.
    */
   def refreshTable(name: TableIdentifier): Unit = {
-    internalCatalog.refreshTable(this, currentDataSource, name)
+    currentSessionCatalog.refreshTable(name)
   }
 
   /**
@@ -445,8 +434,7 @@ class SessionCatalog(
       parts: Seq[CatalogTablePartition],
       ignoreIfExists: Boolean): Unit = {
     // requireDbExists(db)
-    internalCatalog.createPartitions(this, currentDataSource, tableName,
-      parts, ignoreIfExists)
+    currentSessionCatalog.createPartitions(tableName, parts, ignoreIfExists)
   }
 
   /**
@@ -458,8 +446,7 @@ class SessionCatalog(
       specs: Seq[TablePartitionSpec],
       ignoreIfNotExists: Boolean): Unit = {
     // requireDbExists(db)
-    internalCatalog.dropPartitions(this, currentDataSource,
-      tableName, specs, ignoreIfNotExists)
+    currentSessionCatalog.dropPartitions(tableName, specs, ignoreIfNotExists)
   }
 
   /**
@@ -473,7 +460,7 @@ class SessionCatalog(
       specs: Seq[TablePartitionSpec],
       newSpecs: Seq[TablePartitionSpec]): Unit = {
     // requireDbExists(db)
-    internalCatalog.renamePartitions(this, currentDataSource, tableName, specs, newSpecs)
+    currentSessionCatalog.renamePartitions(tableName, specs, newSpecs)
   }
 
   /**
@@ -487,7 +474,7 @@ class SessionCatalog(
    */
   def alterPartitions(tableName: TableIdentifier, parts: Seq[CatalogTablePartition]): Unit = {
     // requireDbExists(db)
-    internalCatalog.alterPartitions(this, currentDataSource, tableName, parts)
+    currentSessionCatalog.alterPartitions(tableName, parts)
   }
 
   /**
@@ -496,7 +483,7 @@ class SessionCatalog(
    */
   def getPartition(tableName: TableIdentifier, spec: TablePartitionSpec): CatalogTablePartition = {
     // requireDbExists(db)
-    internalCatalog.getPartition(this, currentDataSource, tableName, spec)
+    currentSessionCatalog.getPartition(tableName, spec)
   }
 
   /**
@@ -510,7 +497,7 @@ class SessionCatalog(
       tableName: TableIdentifier,
       partialSpec: Option[TablePartitionSpec] = None): Seq[CatalogTablePartition] = {
     // requireDbExists(db)
-    internalCatalog.listPartitions(this, currentDataSource, tableName, partialSpec)
+    currentSessionCatalog.listPartitions(tableName, partialSpec)
   }
 
   /**
@@ -567,7 +554,7 @@ class SessionCatalog(
    * If no such database is specified, create it in the current database.
    */
   def createFunction(funcDefinition: CatalogFunction, ignoreIfExists: Boolean): Unit = {
-    internalCatalog.createFunction(this, currentDataSource, funcDefinition, ignoreIfExists)
+    currentSessionCatalog.createFunction(funcDefinition, ignoreIfExists)
   }
 
   /**
@@ -576,7 +563,7 @@ class SessionCatalog(
    */
   def dropFunction(name: FunctionIdentifier, ignoreIfNotExists: Boolean): Unit = {
     // requireDbExists(db)
-    internalCatalog.dropFunction(this, currentDataSource, name, ignoreIfNotExists)
+    currentSessionCatalog.dropFunction(name, ignoreIfNotExists)
   }
 
   /**
@@ -587,7 +574,7 @@ class SessionCatalog(
    */
   def getFunctionMetadata(name: FunctionIdentifier): CatalogFunction = {
     // requireDbExists(db)
-    internalCatalog.getFunctionMetadata(this, currentDataSource, name)
+    currentSessionCatalog.getFunctionMetadata(name)
   }
 
   /**
@@ -595,7 +582,7 @@ class SessionCatalog(
    */
   def functionExists(name: FunctionIdentifier): Boolean = {
     // requireDbExists(db)
-    internalCatalog.functionExists(this, currentDataSource, name)
+    currentSessionCatalog.functionExists(name)
   }
 
   // ----------------------------------------------------------------
@@ -608,7 +595,7 @@ class SessionCatalog(
    * This performs reflection to decide what type of [[Expression]] to return in the builder.
    */
   private[sql] def makeFunctionBuilder(name: String, functionClassName: String): FunctionBuilder = {
-    internalCatalog.makeFunctionBuilder(this, currentDataSource, name, functionClassName)
+    currentSessionCatalog.makeFunctionBuilder(name, functionClassName)
   }
 
   /**
@@ -652,7 +639,7 @@ class SessionCatalog(
    */
   private[spark] def lookupFunctionInfo(name: FunctionIdentifier): ExpressionInfo = synchronized {
     // requireDbExists(db)
-    internalCatalog.lookupFunctionInfo(this, currentDataSource, name)
+    currentSessionCatalog.lookupFunctionInfo(name)
   }
 
   /**
@@ -671,7 +658,7 @@ class SessionCatalog(
   def lookupFunction(
       name: FunctionIdentifier,
       children: Seq[Expression]): Expression = synchronized {
-    internalCatalog.lookupFunction(this, currentDataSource, name, children)
+    currentSessionCatalog.lookupFunction(name, children)
   }
 
   /**
@@ -687,7 +674,7 @@ class SessionCatalog(
    * defined).
    */
   def listFunctions(db: String, pattern: String): Seq[(FunctionIdentifier, String)] = {
-    internalCatalog.listFunctions(this, currentDataSource, db, pattern)
+    currentSessionCatalog.listFunctions(db, pattern)
   }
 
 
@@ -729,10 +716,14 @@ class SessionCatalog(
   }
 
   def addJar(path: String): Unit = {
-    internalCatalog.addJar(this, currentDataSource, path)
+    currentSessionCatalog.addJar(path)
   }
 
   def getDataSourceSessionCatalog(dataSource: String): DataSourceSessionCatalog = {
     internalCatalog.getSessionCatalog(dataSource, this)
+  }
+
+  private[sql] def setCurrentSessionCatalog(): Unit = {
+    _currentSessionCatalog = Some(getDataSourceSessionCatalog(currentDataSource))
   }
 }
