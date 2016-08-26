@@ -559,3 +559,15 @@ private[sql] case class CurrentDatabase() extends LeafExpression with Unevaluabl
   override def foldable: Boolean = true
   override def nullable: Boolean = false
 }
+
+/**
+ * Returns the current data source of the SessionCatalog.
+ */
+@ExpressionDescription(
+  usage = "_FUNC_() - Returns the current data source.",
+  extended = "> SELECT _FUNC_()")
+private[sql] case class CurrentDataSource() extends LeafExpression with Unevaluable {
+  override def dataType: DataType = StringType
+  override def foldable: Boolean = true
+  override def nullable: Boolean = false
+}

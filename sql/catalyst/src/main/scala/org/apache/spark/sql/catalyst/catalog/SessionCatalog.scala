@@ -31,7 +31,7 @@ import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.analysis.FunctionRegistry.FunctionBuilder
 import org.apache.spark.sql.catalyst.expressions.{Expression, ExpressionInfo}
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 object SessionCatalog {
   val DEFAULT_DATABASE = "default"
@@ -154,7 +154,9 @@ class SessionCatalog(
     if (conf.caseSensitiveAnalysis) name else name.toLowerCase
   }
 
-  // Format datasource name, taking into account case sensitivity.
+  /**
+   * Format data source name, taking into account case sensitivity.
+   */
   protected[this] def formatDataSourceName(name: String): String = {
     if (conf.caseSensitiveAnalysis) name else name.toLowerCase
   }
@@ -171,7 +173,7 @@ class SessionCatalog(
     fs.makeQualified(hadoopPath)
   }
 
-  private def requireDSExists(name: String): Unit = {
+  private def requireDataSourceExists(name: String): Unit = {
     if (!internalCatalog.dsExists(name)) {
       throw new NoSuchDataSourceException(name)
     }
@@ -203,6 +205,10 @@ class SessionCatalog(
     currentSessionCatalog.databaseExists(db)
   }
 
+  def dataSourceExists(dataSource: String): Boolean = {
+    currentSessionCatalog.dataSourceExists(dataSource)
+  }
+
   def listDatabases(): Seq[String] = {
     currentSessionCatalog.listDatabases()
   }
@@ -220,10 +226,14 @@ class SessionCatalog(
     currentSessionCatalog.setCurrentDatabase(db)
   }
 
+  def getCurrentDataSource: String = {
+    currentSessionCatalog.getCurrentDataSource
+  }
+
   def setCurrentDataSource(name: String): Unit = {
-    val dsName = formatDataSourceName(name)
-    requireDSExists(dsName)
-    synchronized { currentDataSource = dsName}
+    val dataSourceName = formatDataSourceName(name)
+    requireDataSourceExists(dataSourceName)
+    synchronized { currentDataSource = dataSourceName}
     setCurrentSessionCatalog()
   }
 
