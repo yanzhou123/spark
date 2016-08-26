@@ -103,30 +103,11 @@ private[sql] class SessionState(sparkSession: SparkSession) {
     newHadoopConf())
 
   private def registerDefaultCatalog() = {
-    val externalCatalog = new InMemoryCatalog(sparkSession.sparkContext.hadoopConfiguration) {
-      override def getSessionCatalog(sessionCatalog: SessionCatalog) = {
-        new DataSourceSessionCatalog(sessionCatalog, this,
-          functionResourceLoader, functionRegistry, conf, catalog.hadoopConf) {
-
-          override val analyzer: Analyzer = new Analyzer(catalog, conf) {
-            override val extendedResolutionRules = Nil
-            override val extendedCheckRules = Nil
-          }
-
-          override val optimizer: Optimizer = new SparkOptimizer(catalog,
-            self.conf, new ExperimentalMethods) {
-            override def batches = Nil
-          }
-
-          override def planner: Any = new SparkPlanner(self.sparkSession.sparkContext,
-            self.conf, Nil) {
-            override def strategies: Seq[Strategy] = Nil
-          }
-        }
-      }
+    if (!catalog.internalCatalog.dsExists(SessionCatalog.DEFAULT_DATASOURCE)) {
+      val externalCatalog = new InMemoryCatalogReal(sparkSession.sparkContext.hadoopConfiguration)
+      val sessionCatalog = externalCatalog.getSessionCatalog(catalog)
+      catalog.internalCatalog.registerDataSource(SessionCatalog.DEFAULT_DATASOURCE, sessionCatalog)
     }
-    val sessionCatalog = externalCatalog.getSessionCatalog(catalog)
-    catalog.internalCatalog.registerDataSource(SessionCatalog.DEFAULT_DATASOURCE, sessionCatalog)
     synchronized {
       catalog.currentDataSource = SessionCatalog.DEFAULT_DATASOURCE
       catalog._currentSessionCatalog = None
@@ -134,11 +115,18 @@ private[sql] class SessionState(sparkSession: SparkSession) {
   }
 
   private def registerHiveCatalog() = {
-    val HIVE_EXTERNAL_CATALOG_CLASS_NAME = "org.apache.spark.sql.hive.HiveExternalCatalog"
     // TODO: make the check-and-put atomic
     if (!catalog.internalCatalog.dsExists("hive")) {
-      catalog.internalCatalog.registerDataSource("hive", HIVE_EXTERNAL_CATALOG_CLASS_NAME,
+      catalog.internalCatalog.registerDataSource("hive",
+        SessionCatalog.HIVE_EXTERNAL_CATALOG_CLASS_NAME,
         Map[String, String](), sparkSession.sparkContext)
+      if (sparkSession.sharedState.externalCatalog == null) {
+        synchronized {
+          if (sparkSession.sharedState.externalCatalog == null) {
+            catalog.internalCatalog.getExternalCatalog("hive")
+          }
+        }
+      }
     }
     synchronized {
       catalog.currentDataSource = "hive"

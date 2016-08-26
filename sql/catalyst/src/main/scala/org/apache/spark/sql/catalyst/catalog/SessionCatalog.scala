@@ -36,6 +36,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan}
 object SessionCatalog {
   val DEFAULT_DATABASE = "default"
   val DEFAULT_DATASOURCE = "in-memory"
+  val HIVE_EXTERNAL_CATALOG_CLASS_NAME = "org.apache.spark.sql.hive.HiveExternalCatalog"
 }
 
 /**

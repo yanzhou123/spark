@@ -64,18 +64,6 @@ class InternalCatalog extends Serializable {
   def getDataSourceCatalog(name: String): Option[ExternalCatalog]
   = externalCatalogMap.get(name)
 
-  private def reflect[T, Arg <: AnyRef](className: String, ctorArg: Arg)
-                                       (implicit ctorArgTag: ClassTag[Arg]): T = {
-    try {
-      val clazz = Utils.classForName(className)
-      val ctor = clazz.getDeclaredConstructor(ctorArgTag.runtimeClass)
-      ctor.newInstance(ctorArg).asInstanceOf[T]
-    } catch {
-      case NonFatal(e) =>
-        throw new IllegalArgumentException(s"Error while instantiating '$className':", e)
-    }
-  }
-
   // To register pre-built data sources such as Hive and In-Memory
   //
   // @param name            data source name
@@ -111,7 +99,8 @@ class InternalCatalog extends Serializable {
     var created = false
     externalCatalogMap.getOrElseUpdate(name, {
       created = true
-      reflect[ExternalCatalog, SparkContext](provider, sparkContext).setProperties(properties)
+      InternalCatalog.reflect[ExternalCatalog, SparkContext](provider, sparkContext)
+        .setProperties(properties)
     })
     if (!created) {
       throw new DataSourceAlreadyExistsException(name)
@@ -148,3 +137,18 @@ class InternalCatalog extends Serializable {
     externalCatalogMap.contains(dataSource)
   }
 }
+
+object InternalCatalog {
+  def reflect[T, Arg <: AnyRef](className: String, ctorArg: Arg)
+    (implicit ctorArgTag: ClassTag[Arg]): T = {
+    try {
+      val clazz = Utils.classForName(className)
+      val ctor = clazz.getDeclaredConstructor(ctorArgTag.runtimeClass)
+      ctor.newInstance(ctorArg).asInstanceOf[T]
+    } catch {
+      case NonFatal(e) =>
+      throw new IllegalArgumentException(s"Error while instantiating '$className':", e)
+    }
+  }
+}
+

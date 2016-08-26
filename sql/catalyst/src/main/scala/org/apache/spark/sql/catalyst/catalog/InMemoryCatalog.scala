@@ -25,7 +25,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.SparkException
-import org.apache.spark.sql.AnalysisException
+import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.optimizer.Optimizer
@@ -43,7 +43,7 @@ import org.apache.spark.sql.catalyst.util.StringUtils
 class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends ExternalCatalog {
   import CatalogTypes.TablePartitionSpec
 
-  override val name = "in-memory"
+  override val name = SessionCatalog.DEFAULT_DATASOURCE
 
   private class TableDesc(var table: CatalogTable) {
     val partitions = new mutable.HashMap[TablePartitionSpec, CatalogTablePartition]
@@ -109,11 +109,14 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
   }
 
   override def getSessionCatalog(sessionCatalog: SessionCatalog): DataSourceSessionCatalog =
-    new DataSourceSessionCatalog(sessionCatalog, this) {
-      override def planner: Any = null
+    new DataSourceSessionCatalog(sessionCatalog, this,
+      sessionCatalog.functionResourceLoader,
+      sessionCatalog.functionRegistry,
+      sessionCatalog.conf, sessionCatalog.hadoopConf) {
 
       override val optimizer: Optimizer = null
       override val analyzer: Analyzer = null
+      override def planner: Any = null
     }
 
   // --------------------------------------------------------------------------

@@ -26,11 +26,10 @@ class MultiDatabaseSuite extends QueryTest with SQLTestUtils with TestHiveSingle
   private lazy val df = spark.range(10).coalesce(1).toDF()
 
   private def checkTablePath(dbName: String, tableName: String): Unit = {
-    val metastoreTable = spark.sharedState.internalCatalog.getExternalCatalog("hive")
+    val metastoreTable = spark.sharedState.externalCatalog
       .getTable(TableIdentifier(tableName, Some(dbName)))
     val expectedPath =
-      spark.sharedState.internalCatalog.getExternalCatalog("hive")
-        .getDatabase(dbName).locationUri + "/" + tableName
+      spark.sharedState.externalCatalog.getDatabase(dbName).locationUri + "/" + tableName
 
     assert(metastoreTable.storage.serdeProperties("path") === expectedPath)
   }
