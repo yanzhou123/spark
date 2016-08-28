@@ -282,19 +282,19 @@ private[sql] class HiveSessionCatalog(
       "spark.sql.hive.thriftServer.singleSession", defaultValue = false)
   }
 
-  lazy val analyzer: Analyzer = {
+  override lazy val analyzer: Analyzer = {
     new Analyzer(sparkSession.sessionState.catalog, conf) {
       override val extendedResolutionRules =
         ParquetConversions :: OrcConversions :: CreateTables :: Nil
     }
   }
 
-  lazy val optimizer: Optimizer = new SparkOptimizer(sparkSession.sessionState.catalog,
+  override lazy val optimizer: Optimizer = new SparkOptimizer(sparkSession.sessionState.catalog,
     conf, new ExperimentalMethods) {
     override def batches: Seq[Batch] = Nil
   }
 
-  def planner: SparkPlanner =
+  override def planner: SparkPlanner =
     new SparkPlanner(sparkSession.sparkContext, conf, Nil) with HiveStrategies {
       override val sparkSession: SparkSession = self.sparkSession
       override def strategies: Seq[Strategy] = {

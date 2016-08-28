@@ -112,12 +112,7 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
     new DataSourceSessionCatalog(sessionCatalog, this,
       sessionCatalog.functionResourceLoader,
       sessionCatalog.functionRegistry,
-      sessionCatalog.conf, sessionCatalog.hadoopConf) {
-
-      override val optimizer: Optimizer = null
-      override val analyzer: Analyzer = null
-      override def planner: Any = null
-    }
+      sessionCatalog.conf, sessionCatalog.hadoopConf)
 
   // --------------------------------------------------------------------------
   // Databases

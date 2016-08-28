@@ -43,7 +43,7 @@ object DataSourceSessionCatalog {
  *
  * This class must be thread-safe.
  */
-abstract class DataSourceSessionCatalog(
+class DataSourceSessionCatalog(
                                          val parent: SessionCatalog,
                                          val externalCatalog: ExternalCatalog,
                                          functionResourceLoader: FunctionResourceLoader,
@@ -863,10 +863,10 @@ abstract class DataSourceSessionCatalog(
     // No-op by default
   }
 
-  val analyzer: Analyzer
+  lazy val analyzer: Analyzer = null
 
-  val optimizer: Optimizer
+  lazy val optimizer: Optimizer = null
 
   // To avoid circular dependence from sql.internal to catalyst, using Any now: to be revisited
-  def planner: Any
+  def planner: Any = null
 }

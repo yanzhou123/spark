@@ -154,7 +154,7 @@ private[sql] class SessionState(sparkSession: SparkSession) {
   // helper to combine children rules
   private def combine[T](sss: Seq[DataSourceSessionCatalog],
                          s: DataSourceSessionCatalog => Seq[T]): Seq[T] = {
-    sss.map(s(_)).reduceLeft(_ ++ _)
+    sss.filterNot(_ == null).map(s(_)).reduceLeft(_ ++ _)
   }
 
   /**
