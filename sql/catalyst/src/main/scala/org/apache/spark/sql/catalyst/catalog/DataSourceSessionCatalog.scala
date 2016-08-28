@@ -22,9 +22,8 @@ import javax.annotation.concurrent.GuardedBy
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.internal.Logging
 import org.apache.spark.sql.AnalysisException
-import org.apache.spark.sql.catalyst.{CatalystConf, FunctionIdentifier, SimpleCatalystConf, TableIdentifier}
+import org.apache.spark.sql.catalyst.{CatalystConf, FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.analysis.FunctionRegistry.FunctionBuilder
 import org.apache.spark.sql.catalyst.expressions.{Expression, ExpressionInfo}
@@ -102,6 +101,13 @@ class DataSourceSessionCatalog(
   }
 
   /**
+   * Format data source name, taking into account case sensitivity.
+   */
+  override protected[this] def formatDataSourceName(name: String): String = {
+    if (conf.caseSensitiveAnalysis) name else name.toLowerCase
+  }
+
+  /**
    * This method is used to make the given path qualified before we
    * store this path in the underlying external catalog. So, when a path
    * does not contain a scheme, this path will not be changed after the default
@@ -116,6 +122,12 @@ class DataSourceSessionCatalog(
   private def requireDbExists(db: String): Unit = {
     if (!databaseExists(db)) {
       throw new NoSuchDatabaseException(db)
+    }
+  }
+
+  private def requireDataSourceExists(name: String): Unit = {
+    if (!dataSourceExists(name)) {
+      throw new NoSuchDataSourceException(name)
     }
   }
 
@@ -191,6 +203,18 @@ class DataSourceSessionCatalog(
     requireDbExists(dbName)
     synchronized {
       currentDb = dbName
+    }
+  }
+
+  override def getCurrentDataSource: String = synchronized {
+    currentDataSource
+  }
+
+  override def setCurrentDataSource(dataSource: String): Unit = {
+    val dataSourceName = formatDataSourceName(dataSource)
+    requireDataSourceExists(dataSourceName)
+    synchronized {
+      currentDataSource = dataSourceName
     }
   }
 

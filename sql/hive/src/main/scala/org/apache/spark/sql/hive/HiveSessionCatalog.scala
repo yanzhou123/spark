@@ -29,9 +29,9 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis.{Analyzer, FunctionRegistry}
 import org.apache.spark.sql.catalyst.analysis.FunctionRegistry.FunctionBuilder
-import org.apache.spark.sql.catalyst.catalog.{DataSourceSessionCatalog, FunctionResourceLoader, SessionCatalog}
+import org.apache.spark.sql.catalyst.catalog.{DataSourceSessionCatalog, FunctionResourceLoader}
 import org.apache.spark.sql.catalyst.expressions.{Cast, Expression, ExpressionInfo}
-import org.apache.spark.sql.catalyst.optimizer.{GetCurrentDatabase, Optimizer}
+import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{SparkOptimizer, SparkPlanner}

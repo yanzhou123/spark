@@ -23,7 +23,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.sql.catalyst.{CatalystConf, SimpleCatalystConf}
 import org.apache.spark.sql.catalyst.analysis._
-import org.apache.spark.sql.catalyst.catalog.{InMemoryCatalog, InternalCatalog, SessionCatalog}
+import org.apache.spark.sql.catalyst.catalog.{InMemoryCatalog, SessionCatalog}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.Literal.{FalseLiteral, TrueLiteral}
@@ -52,6 +52,7 @@ abstract class Optimizer(sessionCatalog: SessionCatalog, conf: CatalystConf)
       ReplaceExpressions,
       ComputeCurrentTime,
       GetCurrentDatabase(sessionCatalog),
+      GetCurrentDataSource(sessionCatalog),
       RewriteDistinctAggregates) ::
     //////////////////////////////////////////////////////////////////////////////////////////
     // Optimizer rules start here
@@ -1601,6 +1602,16 @@ case class GetCurrentDatabase(sessionCatalog: SessionCatalog) extends Rule[Logic
     plan transformAllExpressions {
       case CurrentDatabase() =>
         Literal.create(sessionCatalog.getCurrentDatabase, StringType)
+    }
+  }
+}
+
+/** Replaces the expression of CurrentDatabase with the current database name. */
+case class GetCurrentDataSource(sessionCatalog: SessionCatalog) extends Rule[LogicalPlan] {
+  def apply(plan: LogicalPlan): LogicalPlan = {
+    plan transformAllExpressions {
+      case CurrentDataSource() =>
+        Literal.create(sessionCatalog.getCurrentDataSource, StringType)
     }
   }
 }
