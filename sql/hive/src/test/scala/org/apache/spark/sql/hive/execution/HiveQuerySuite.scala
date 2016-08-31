@@ -1120,6 +1120,10 @@ class HiveQuerySuite extends HiveComparisonTest with BeforeAndAfter {
 
   }
 
+  test("use datasource") {
+    assert("in-memory" == sql("SELECT current_datasource()").first().getString(0))
+  }
+
   test("use database") {
     val currentDatabase = sql("select current_database()").first().getString(0)
 

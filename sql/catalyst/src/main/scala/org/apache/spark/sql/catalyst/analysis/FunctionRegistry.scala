@@ -370,6 +370,7 @@ object FunctionRegistry {
     expression[InputFileName]("input_file_name"),
     expression[MonotonicallyIncreasingID]("monotonically_increasing_id"),
     expression[CurrentDatabase]("current_database"),
+    expression[CurrentDataSource]("current_datasource"),
     expression[CallMethodViaReflection]("reflect"),
     expression[CallMethodViaReflection]("java_method"),
 
