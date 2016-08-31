@@ -43,13 +43,9 @@ class InternalCatalog extends Serializable {
   // for persistent purpose later
   var dirty = false
 
-  def this(name: String, externalCatalog: ExternalCatalog) = {
-    this
-    registerDataSource(name, externalCatalog)
-  }
-
   def this(externalCatalog: ExternalCatalog) = {
-    this(externalCatalog.name, externalCatalog)
+    this
+    registerDataSource(externalCatalog)
   }
 
   // TODO: use Guava Cache??
@@ -68,14 +64,14 @@ class InternalCatalog extends Serializable {
   //
   // @param name            data source name
   // @param externalCatalog external catalog
-  def registerDataSource(name: String, externalCatalog: ExternalCatalog): Unit = {
+  def registerDataSource(externalCatalog: ExternalCatalog): Unit = {
     var created = false
-    externalCatalogMap.getOrElseUpdate(name, {
+    externalCatalogMap.getOrElseUpdate(externalCatalog.name, {
       created = true
       externalCatalog
     })
     if (!created) {
-      throw new DataSourceAlreadyExistsException(name)
+      throw new DataSourceAlreadyExistsException(externalCatalog.name)
     }
   }
 
