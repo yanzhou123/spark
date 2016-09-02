@@ -264,8 +264,12 @@ class SessionCatalog(
    * If no such database is specified, create it in the current database.
    */
   def createTable(tableDefinition: CatalogTable, ignoreIfExists: Boolean): Unit = {
-    // requireDbExists(db)
-    currentSessionCatalog.createTable(tableDefinition, ignoreIfExists)
+    val dataSource = tableDefinition.identifier.dataSource
+    if (dataSource.isEmpty) {
+      currentSessionCatalog.createTable(tableDefinition, ignoreIfExists)
+    } else {
+      getDataSourceSessionCatalog(dataSource.get).createTable(tableDefinition, ignoreIfExists)
+    }
   }
 
   /**
@@ -278,8 +282,12 @@ class SessionCatalog(
    * this becomes a no-op.
    */
   def alterTable(tableDefinition: CatalogTable): Unit = {
-    // requireDbExists(db)
-    currentSessionCatalog.alterTable(tableDefinition)
+    val dataSource = tableDefinition.identifier.dataSource
+    if (dataSource.isEmpty) {
+      currentSessionCatalog.alterTable(tableDefinition)
+    } else {
+      getDataSourceSessionCatalog(dataSource.get).alterTable(tableDefinition)
+    }
   }
 
   /**
@@ -288,8 +296,11 @@ class SessionCatalog(
    * If the specified table is not found in the database then a [[NoSuchTableException]] is thrown.
    */
   def getTableMetadata(name: TableIdentifier): CatalogTable = {
-    // requireDbExists(db)
-    currentSessionCatalog.getTableMetadata(name)
+    if (name.dataSource.isEmpty) {
+      currentSessionCatalog.getTableMetadata(name)
+    } else {
+      getDataSourceSessionCatalog(name.dataSource.get).getTableMetadata(name)
+    }
   }
 
   /**
@@ -298,8 +309,11 @@ class SessionCatalog(
    * If the specified table is not found in the database then return None if it doesn't exist.
    */
   def getTableMetadataOption(name: TableIdentifier): Option[CatalogTable] = {
-    // requireDbExists(db)
-    currentSessionCatalog.getTableMetadataOption(name)
+    if (name.dataSource.isEmpty) {
+      currentSessionCatalog.getTableMetadataOption(name)
+    } else {
+      getDataSourceSessionCatalog(name.dataSource.get).getTableMetadataOption(name)
+    }
   }
 
   /**
@@ -312,8 +326,12 @@ class SessionCatalog(
       loadPath: String,
       isOverwrite: Boolean,
       holdDDLTime: Boolean): Unit = {
-    // requireDbExists(db)
-    currentSessionCatalog.loadTable(name, loadPath, isOverwrite, holdDDLTime)
+    if (name.dataSource.isEmpty) {
+      currentSessionCatalog.loadTable(name, loadPath, isOverwrite, holdDDLTime)
+    } else {
+      getDataSourceSessionCatalog(name.dataSource.get)
+        .loadTable(name, loadPath, isOverwrite, holdDDLTime)
+    }
   }
 
   /**
@@ -329,9 +347,13 @@ class SessionCatalog(
       holdDDLTime: Boolean,
       inheritTableSpecs: Boolean,
       isSkewedStoreAsSubdir: Boolean): Unit = {
-    // requireDbExists(db)
-    currentSessionCatalog.loadPartition(name, loadPath, partition, isOverwrite, holdDDLTime,
-      inheritTableSpecs, isSkewedStoreAsSubdir)
+    if (name.dataSource.isEmpty) {
+      currentSessionCatalog.loadPartition(name, loadPath, partition, isOverwrite, holdDDLTime,
+        inheritTableSpecs, isSkewedStoreAsSubdir)
+    } else {
+      getDataSourceSessionCatalog(name.dataSource.get).loadPartition(name, loadPath, partition,
+        isOverwrite, holdDDLTime, inheritTableSpecs, isSkewedStoreAsSubdir)
+    }
   }
 
   def defaultTablePath(tableIdent: TableIdentifier): String = {
@@ -369,7 +391,13 @@ class SessionCatalog(
    * This assumes the database specified in `oldName` matches the one specified in `newName`.
    */
   def renameTable(oldName: TableIdentifier, newName: TableIdentifier): Unit = synchronized {
-    currentSessionCatalog.renameTable(oldName, newName)
+    require(oldName.dataSource == newName.dataSource,
+      "data source should be same for renaming the table")
+    if (oldName.dataSource.isEmpty) {
+      currentSessionCatalog.renameTable(oldName, newName)
+    } else {
+      getDataSourceSessionCatalog(oldName.dataSource.get).renameTable(oldName, newName)
+    }
   }
 
   /**
@@ -380,8 +408,11 @@ class SessionCatalog(
    * the same name, then, if that does not exist, drop the table from the current database.
    */
   def dropTable(name: TableIdentifier, ignoreIfNotExists: Boolean): Unit = synchronized {
-    //  requireDbExists(db)
-    currentSessionCatalog.dropTable(name, ignoreIfNotExists)
+    if (name.dataSource.isEmpty) {
+      currentSessionCatalog.dropTable(name, ignoreIfNotExists)
+    } else {
+      getDataSourceSessionCatalog(name.dataSource.get).dropTable(name, ignoreIfNotExists)
+    }
   }
 
   /**
@@ -393,7 +424,11 @@ class SessionCatalog(
    */
   def lookupRelation(name: TableIdentifier, alias: Option[String] = None): LogicalPlan = {
     synchronized {
-      currentSessionCatalog.lookupRelation(name, alias)
+      if (name.dataSource.isEmpty) {
+        currentSessionCatalog.lookupRelation(name, alias)
+      } else {
+        getDataSourceSessionCatalog(name.dataSource.get).lookupRelation(name, alias)
+      }
     }
   }
 
@@ -406,7 +441,11 @@ class SessionCatalog(
    * contain the table.
    */
   def tableExists(name: TableIdentifier): Boolean = synchronized {
-    currentSessionCatalog.tableExists(name)
+    if (name.dataSource.isEmpty) {
+      currentSessionCatalog.tableExists(name)
+    } else {
+      getDataSourceSessionCatalog(name.dataSource.get).tableExists(name)
+    }
   }
 
   /**
@@ -436,7 +475,11 @@ class SessionCatalog(
    * Refresh the cache entry for a metastore table, if any.
    */
   def refreshTable(name: TableIdentifier): Unit = {
-    currentSessionCatalog.refreshTable(name)
+    if (name.dataSource.isEmpty) {
+      currentSessionCatalog.refreshTable(name)
+    } else {
+      getDataSourceSessionCatalog(name.dataSource.get).refreshTable(name)
+    }
   }
 
   /**
@@ -475,8 +518,12 @@ class SessionCatalog(
       tableName: TableIdentifier,
       parts: Seq[CatalogTablePartition],
       ignoreIfExists: Boolean): Unit = {
-    // requireDbExists(db)
-    currentSessionCatalog.createPartitions(tableName, parts, ignoreIfExists)
+    if (tableName.dataSource.isEmpty) {
+      currentSessionCatalog.createPartitions(tableName, parts, ignoreIfExists)
+    } else {
+      getDataSourceSessionCatalog(tableName.dataSource.get)
+        .createPartitions(tableName, parts, ignoreIfExists)
+    }
   }
 
   /**
@@ -487,8 +534,12 @@ class SessionCatalog(
       tableName: TableIdentifier,
       specs: Seq[TablePartitionSpec],
       ignoreIfNotExists: Boolean): Unit = {
-    // requireDbExists(db)
-    currentSessionCatalog.dropPartitions(tableName, specs, ignoreIfNotExists)
+    if (tableName.dataSource.isEmpty) {
+      currentSessionCatalog.dropPartitions(tableName, specs, ignoreIfNotExists)
+    } else {
+      getDataSourceSessionCatalog(tableName.dataSource.get)
+        .dropPartitions(tableName, specs, ignoreIfNotExists)
+    }
   }
 
   /**
@@ -501,8 +552,12 @@ class SessionCatalog(
       tableName: TableIdentifier,
       specs: Seq[TablePartitionSpec],
       newSpecs: Seq[TablePartitionSpec]): Unit = {
-    // requireDbExists(db)
-    currentSessionCatalog.renamePartitions(tableName, specs, newSpecs)
+    if (tableName.dataSource.isEmpty) {
+      currentSessionCatalog.renamePartitions(tableName, specs, newSpecs)
+    } else {
+      getDataSourceSessionCatalog(tableName.dataSource.get)
+        .renamePartitions(tableName, specs, newSpecs)
+    }
   }
 
   /**
@@ -515,8 +570,11 @@ class SessionCatalog(
    * this becomes a no-op.
    */
   def alterPartitions(tableName: TableIdentifier, parts: Seq[CatalogTablePartition]): Unit = {
-    // requireDbExists(db)
-    currentSessionCatalog.alterPartitions(tableName, parts)
+    if (tableName.dataSource.isEmpty) {
+      currentSessionCatalog.alterPartitions(tableName, parts)
+    } else {
+      getDataSourceSessionCatalog(tableName.dataSource.get).alterPartitions(tableName, parts)
+    }
   }
 
   /**
@@ -524,8 +582,11 @@ class SessionCatalog(
    * If no database is specified, assume the table is in the current database.
    */
   def getPartition(tableName: TableIdentifier, spec: TablePartitionSpec): CatalogTablePartition = {
-    // requireDbExists(db)
-    currentSessionCatalog.getPartition(tableName, spec)
+    if (tableName.dataSource.isEmpty) {
+      currentSessionCatalog.getPartition(tableName, spec)
+    } else {
+      getDataSourceSessionCatalog(tableName.dataSource.get).getPartition(tableName, spec)
+    }
   }
 
   /**
@@ -538,8 +599,11 @@ class SessionCatalog(
   def listPartitions(
       tableName: TableIdentifier,
       partialSpec: Option[TablePartitionSpec] = None): Seq[CatalogTablePartition] = {
-    // requireDbExists(db)
-    currentSessionCatalog.listPartitions(tableName, partialSpec)
+    if (tableName.dataSource.isEmpty) {
+      currentSessionCatalog.listPartitions(tableName, partialSpec)
+    } else {
+      getDataSourceSessionCatalog(tableName.dataSource.get).listPartitions(tableName, partialSpec)
+    }
   }
 
   /**
@@ -596,7 +660,12 @@ class SessionCatalog(
    * If no such database is specified, create it in the current database.
    */
   def createFunction(funcDefinition: CatalogFunction, ignoreIfExists: Boolean): Unit = {
-    currentSessionCatalog.createFunction(funcDefinition, ignoreIfExists)
+    val dataSource = funcDefinition.identifier.dataSource
+    if (dataSource.isEmpty) {
+      currentSessionCatalog.createFunction(funcDefinition, ignoreIfExists)
+    } else {
+      getDataSourceSessionCatalog(dataSource.get).createFunction(funcDefinition, ignoreIfExists)
+    }
   }
 
   /**
@@ -604,8 +673,11 @@ class SessionCatalog(
    * If no database is specified, assume the function is in the current database.
    */
   def dropFunction(name: FunctionIdentifier, ignoreIfNotExists: Boolean): Unit = {
-    // requireDbExists(db)
-    currentSessionCatalog.dropFunction(name, ignoreIfNotExists)
+    if (name.dataSource.isEmpty) {
+      currentSessionCatalog.dropFunction(name, ignoreIfNotExists)
+    } else {
+      getDataSourceSessionCatalog(name.dataSource.get).dropFunction(name, ignoreIfNotExists)
+    }
   }
 
   /**
@@ -615,16 +687,22 @@ class SessionCatalog(
    * If no database is specified, this will return the function in the current database.
    */
   def getFunctionMetadata(name: FunctionIdentifier): CatalogFunction = {
-    // requireDbExists(db)
-    currentSessionCatalog.getFunctionMetadata(name)
+    if (name.dataSource.isEmpty) {
+      currentSessionCatalog.getFunctionMetadata(name)
+    } else {
+      getDataSourceSessionCatalog(name.dataSource.get).getFunctionMetadata(name)
+    }
   }
 
   /**
    * Check if the specified function exists.
    */
   def functionExists(name: FunctionIdentifier): Boolean = {
-    // requireDbExists(db)
-    currentSessionCatalog.functionExists(name)
+    if (name.dataSource.isEmpty) {
+      currentSessionCatalog.functionExists(name)
+    } else {
+      getDataSourceSessionCatalog(name.dataSource.get).functionExists(name)
+    }
   }
 
   // ----------------------------------------------------------------
@@ -680,8 +758,11 @@ class SessionCatalog(
    * Look up the [[ExpressionInfo]] associated with the specified function, assuming it exists.
    */
   private[spark] def lookupFunctionInfo(name: FunctionIdentifier): ExpressionInfo = synchronized {
-    // requireDbExists(db)
-    currentSessionCatalog.lookupFunctionInfo(name)
+    if (name.dataSource.isEmpty) {
+      currentSessionCatalog.lookupFunctionInfo(name)
+    } else {
+      getDataSourceSessionCatalog(name.dataSource.get).lookupFunctionInfo(name)
+    }
   }
 
   /**
@@ -700,7 +781,11 @@ class SessionCatalog(
   def lookupFunction(
       name: FunctionIdentifier,
       children: Seq[Expression]): Expression = synchronized {
-    currentSessionCatalog.lookupFunction(name, children)
+    if (name.dataSource.isEmpty) {
+      currentSessionCatalog.lookupFunction(name, children)
+    } else {
+      getDataSourceSessionCatalog(name.dataSource.get).lookupFunction(name, children)
+    }
   }
 
   /**

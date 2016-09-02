@@ -60,10 +60,10 @@ class InternalCatalog extends Serializable {
   def getDataSourceCatalog(name: String): Option[ExternalCatalog]
   = externalCatalogMap.get(name)
 
-  // To register pre-built data sources such as Hive and In-Memory
-  //
-  // @param name            data source name
-  // @param externalCatalog external catalog
+  /**
+   * To register pre-built data sources such as Hive and In-Memory
+   * @param externalCatalog external catalog
+   */
   def registerDataSource(externalCatalog: ExternalCatalog): Unit = {
     var created = false
     externalCatalogMap.getOrElseUpdate(externalCatalog.name, {

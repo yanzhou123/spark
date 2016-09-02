@@ -32,6 +32,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.scheduler.{SparkListener, SparkListenerApplicationEnd}
 import org.apache.spark.sql.catalog.Catalog
 import org.apache.spark.sql.catalyst._
+import org.apache.spark.sql.catalyst.catalog.ExternalCatalog
 import org.apache.spark.sql.catalyst.encoders._
 import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, Range}
@@ -544,6 +545,13 @@ class SparkSession private(
    * @since 2.0.0
    */
   @transient lazy val catalog: Catalog = new CatalogImpl(self)
+
+  /**
+   * Register a data source.
+   */
+  def registerDataSource(externalCatalog: ExternalCatalog): Unit = {
+    sharedState.internalCatalog.registerDataSource(externalCatalog)
+  }
 
   /**
    * Returns the specified table as a [[DataFrame]].
