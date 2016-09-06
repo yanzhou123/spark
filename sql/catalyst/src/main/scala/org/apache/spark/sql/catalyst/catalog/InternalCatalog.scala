@@ -57,8 +57,7 @@ class InternalCatalog extends Serializable {
   // Mapping from Data Source to ExternalCatalog
   private lazy val externalCatalogMap = new ConcurrentHashMap[String, ExternalCatalog]().asScala
 
-  def getDataSourceCatalog(name: String): Option[ExternalCatalog]
-  = externalCatalogMap.get(name)
+  def getDataSourceCatalog(name: String): Option[ExternalCatalog] = externalCatalogMap.get(name)
 
   /**
    * To register pre-built data sources such as Hive and In-Memory
