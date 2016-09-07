@@ -154,7 +154,7 @@ private[sql] class SessionState(sparkSession: SparkSession) {
   // helper to combine children rules
   private def combine[T](sss: Seq[DataSourceSessionCatalog],
                          s: DataSourceSessionCatalog => Seq[T]): Seq[T] = {
-    sss.filterNot(_ == null).map(s(_)).reduceLeft(_ ++ _)
+    sss.map(s(_)).reduceLeft(_ ++ _)
   }
 
   /**
@@ -162,15 +162,21 @@ private[sql] class SessionState(sparkSession: SparkSession) {
    */
   lazy val analyzer: Analyzer = new Analyzer(catalog, conf) {
     override val extendedResolutionRules = combine[Rule[LogicalPlan]](sessionCatalogs,
-      (s: DataSourceSessionCatalog) => s.analyzer.extendedResolutionRules) ++
-      (PreprocessTableInsertion(conf) ::
+      (s: DataSourceSessionCatalog) => if (s.analyzer != null)
+      {
+        s.analyzer.extendedResolutionRules
+      } else {
+        Nil
+      }) ++ (PreprocessTableInsertion(conf) ::
         new FindDataSourceTable(sparkSession) :: DataSourceAnalysis(conf) ::
           (if (conf.runSQLonFile) new ResolveDataSource(sparkSession) :: Nil else Nil))
 
-
     override val extendedCheckRules = combine[LogicalPlan => Unit](sessionCatalogs,
-      (s: DataSourceSessionCatalog) => s.analyzer.extendedCheckRules) ++
-      Seq(PreWriteCheck(conf, catalog))
+      (s: DataSourceSessionCatalog) => if (s.analyzer != null) {
+        s.analyzer.extendedCheckRules
+      } else {
+        Nil
+      }) ++ Seq(PreWriteCheck(conf, catalog))
   }
 
   /**
@@ -179,7 +185,11 @@ private[sql] class SessionState(sparkSession: SparkSession) {
   lazy val optimizer: Optimizer = new SparkOptimizer(catalog, conf, experimentalMethods) {
     override def execute(plan: LogicalPlan): LogicalPlan = {
       super.execute(sessionCatalogs.foldLeft(plan) {
-        (p, x) => x.optimizer.execute(p)
+        (p, x) => if (x.optimizer != null) {
+          x.optimizer.execute(p)
+        } else {
+          p
+        }
       })
     }
   }
@@ -195,8 +205,11 @@ private[sql] class SessionState(sparkSession: SparkSession) {
   def planner: SparkPlanner =
     new SparkPlanner(sparkSession.sparkContext, conf, experimentalMethods.extraStrategies) {
       override def strategies: Seq[Strategy] = combine[Strategy](sessionCatalogs,
-        (s: DataSourceSessionCatalog) => s.planner.asInstanceOf[SparkPlanner].strategies) ++
-        super.strategies
+        (s: DataSourceSessionCatalog) => if (s.planner != null) {
+          s.planner.asInstanceOf[SparkPlanner].strategies
+        } else {
+          Nil
+        }) ++ super.strategies
     }
 
   /**
