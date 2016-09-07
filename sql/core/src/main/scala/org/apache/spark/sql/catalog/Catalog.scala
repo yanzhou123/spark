@@ -19,6 +19,7 @@ package org.apache.spark.sql.catalog
 
 import org.apache.spark.annotation.Experimental
 import org.apache.spark.sql.{AnalysisException, DataFrame, Dataset}
+import org.apache.spark.sql.catalyst.catalog.ExternalCatalog
 import org.apache.spark.sql.types.StructType
 
 
@@ -28,6 +29,25 @@ import org.apache.spark.sql.types.StructType
  * @since 2.0.0
  */
 abstract class Catalog {
+  /**
+   * Register a data source.
+   */
+  def registerDataSource(externalCatalog: ExternalCatalog): Unit
+
+  /**
+   * Get a list of registered data source.
+   */
+  def getDataSourceList(): List[String]
+
+  /**
+   * Returns the current data source in this session.
+   */
+  def currentDataSource: String
+
+  /**
+   * Sets the current data source in this session.
+   */
+  def setCurrentDataSource(dataSource: String): Unit
 
   /**
    * Returns the current default database in this session.

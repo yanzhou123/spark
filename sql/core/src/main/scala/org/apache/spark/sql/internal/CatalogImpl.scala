@@ -19,12 +19,11 @@ package org.apache.spark.sql.internal
 
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe.TypeTag
-
 import org.apache.spark.annotation.Experimental
 import org.apache.spark.sql.{AnalysisException, DataFrame, Dataset, SparkSession}
 import org.apache.spark.sql.catalog.{Catalog, Column, Database, Function, Table}
 import org.apache.spark.sql.catalyst.{DefinedByConstructorParams, TableIdentifier}
-import org.apache.spark.sql.catalyst.catalog.SessionCatalog
+import org.apache.spark.sql.catalyst.catalog.{ExternalCatalog, SessionCatalog}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.plans.logical.LocalRelation
 import org.apache.spark.sql.execution.datasources.CreateTableUsing
@@ -44,10 +43,44 @@ class CatalogImpl(sparkSession: SparkSession) extends Catalog {
     }
   }
 
+  private def requireDataSourceExists(dataSource: String): Unit = {
+    if (!sessionCatalog.dataSourceExists(dataSource)) {
+      throw new AnalysisException(s"Data source '$dataSource' does not exist.")
+    }
+  }
+
   private def requireTableExists(dbName: String, tableName: String): Unit = {
     if (!sessionCatalog.tableExists(TableIdentifier(tableName, Some(dbName)))) {
       throw new AnalysisException(s"Table '$tableName' does not exist in database '$dbName'.")
     }
+  }
+
+  /**
+   * Register a data source.
+   */
+  override def registerDataSource(externalCatalog: ExternalCatalog): Unit = {
+    sparkSession.sharedState.internalCatalog.registerDataSource(externalCatalog)
+  }
+
+  /**
+   * Get a list of registered data source.
+   */
+  override def getDataSourceList(): List[String] = {
+    sparkSession.sharedState.internalCatalog.getDataSourceList()
+  }
+
+  /**
+   * Returns the current data source in this session.
+   */
+  def currentDataSource: String = sessionCatalog.getCurrentDataSource
+
+  /**
+   * Sets the current data source in this session.
+   */
+  @throws[AnalysisException]("data source does not exist")
+  def setCurrentDataSource(dataSource: String): Unit = {
+    requireDataSourceExists(dataSource)
+     sessionCatalog.setCurrentDataSource(dataSource)
   }
 
   /**

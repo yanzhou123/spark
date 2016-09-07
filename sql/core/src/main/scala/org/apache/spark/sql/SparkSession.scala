@@ -547,20 +547,6 @@ class SparkSession private(
   @transient lazy val catalog: Catalog = new CatalogImpl(self)
 
   /**
-   * Register a data source.
-   */
-  def registerDataSource(externalCatalog: ExternalCatalog): Unit = {
-    sharedState.internalCatalog.registerDataSource(externalCatalog)
-  }
-
-  /**
-   * Get a list of registered data source.
-   */
-  def getDataSourceList(): List[String] = {
-    sharedState.internalCatalog.getDataSourceList()
-  }
-
-  /**
    * Returns the specified table as a [[DataFrame]].
    *
    * @since 2.0.0
