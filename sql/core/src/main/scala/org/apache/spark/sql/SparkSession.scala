@@ -554,6 +554,13 @@ class SparkSession private(
   }
 
   /**
+   * Get a list of registered data source.
+   */
+  def getDataSourceList(): List[String] = {
+    sharedState.internalCatalog.getDataSourceList()
+  }
+
+  /**
    * Returns the specified table as a [[DataFrame]].
    *
    * @since 2.0.0
