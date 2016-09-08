@@ -19,6 +19,7 @@ package org.apache.spark.sql.internal
 
 import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe.TypeTag
+
 import org.apache.spark.annotation.Experimental
 import org.apache.spark.sql.{AnalysisException, DataFrame, Dataset, SparkSession}
 import org.apache.spark.sql.catalog.{Catalog, Column, Database, Function, Table}
