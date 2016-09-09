@@ -86,6 +86,10 @@ class DataSourceSessionCatalog(
     formatDatabaseName(defaultName)
   }
 
+  override private[sql] final def currentSessionCatalog = {
+    throw new UnsupportedOperationException("currentSessionCatalog")
+  }
+
   /**
    * * Format table name, taking into account case sensitivity.
    */
@@ -211,11 +215,7 @@ class DataSourceSessionCatalog(
   }
 
   override def setCurrentDataSource(dataSource: String): Unit = {
-    val dataSourceName = formatDataSourceName(dataSource)
-    requireDataSourceExists(dataSourceName)
-    synchronized {
-      currentDataSource = dataSourceName
-    }
+    throw new UnsupportedOperationException("setCurrentDataSource")
   }
 
   /**

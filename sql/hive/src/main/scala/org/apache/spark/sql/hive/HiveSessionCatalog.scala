@@ -69,7 +69,7 @@ private[sql] class HiveSessionCatalog(
     val table = formatTableName(name.table)
     if (name.database.isDefined || !tempTables.contains(table)) {
       val database = name.database.map(formatDatabaseName)
-      val newName = name.copy(database = database, table = table)
+      val newName = name.copy(database = database, table = table, dataSource = None)
       metastoreCatalog.lookupRelation(newName, alias)
     } else {
       val relation = tempTables(table)
@@ -88,7 +88,7 @@ private[sql] class HiveSessionCatalog(
   // essentially a cache for metastore tables. However, it relies on a lot of session-specific
   // things so it would be a lot of work to split its functionality between HiveSessionCatalog
   // and HiveCatalog. We should still do it at some point...
-  private val metastoreCatalog = new HiveMetastoreCatalog(sparkSession)
+  private val metastoreCatalog = new HiveMetastoreCatalog(sparkSession, externalCatalog)
 
   val ParquetConversions: Rule[LogicalPlan] = metastoreCatalog.ParquetConversions
   val OrcConversions: Rule[LogicalPlan] = metastoreCatalog.OrcConversions

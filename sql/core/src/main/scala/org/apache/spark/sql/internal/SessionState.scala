@@ -109,7 +109,7 @@ private[sql] class SessionState(sparkSession: SparkSession) {
       catalog.internalCatalog.registerDataSource(SessionCatalog.DEFAULT_DATASOURCE, sessionCatalog)
     }
     synchronized {
-      catalog.currentDataSource = SessionCatalog.DEFAULT_DATASOURCE
+      catalog._currentDataSource = SessionCatalog.DEFAULT_DATASOURCE
       catalog._currentSessionCatalog = None
     }
   }
@@ -129,7 +129,7 @@ private[sql] class SessionState(sparkSession: SparkSession) {
       }
     }
     synchronized {
-      catalog.currentDataSource = "hive"
+      catalog._currentDataSource = "hive"
       catalog._currentSessionCatalog = None
     }
   }

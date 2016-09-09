@@ -129,7 +129,8 @@ class SessionCatalog(
   @GuardedBy("this")
   private[sql] val tempTables = new mutable.HashMap[String, LogicalPlan]
 
-  private[sql] var currentDataSource: String = DEFAULT_DATASOURCE
+  private[sql] def currentDataSource = _currentDataSource
+  private[sql] var _currentDataSource: String = DEFAULT_DATASOURCE
 
   private[sql] def currentSessionCatalog = {
     _currentSessionCatalog.getOrElse {
@@ -185,6 +186,10 @@ class SessionCatalog(
   // All methods in this category interact directly with the underlying catalog.
   // ----------------------------------------------------------------------------
 
+  def getTablesByDataSource(dataSource: String): Seq[TableIdentifier] = {
+    getDataSourceSessionCatalog(dataSource).listTables(getCurrentDatabase)
+  }
+
   def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = {
     currentSessionCatalog.createDatabase(dbDefinition, ignoreIfExists)
   }
@@ -233,7 +238,7 @@ class SessionCatalog(
   def setCurrentDataSource(name: String): Unit = {
     val dataSourceName = formatDataSourceName(name)
     requireDataSourceExists(dataSourceName)
-    synchronized { currentDataSource = dataSourceName}
+    synchronized { _currentDataSource = dataSourceName}
     setCurrentSessionCatalog()
   }
 
@@ -427,7 +432,8 @@ class SessionCatalog(
       if (name.dataSource.isEmpty) {
         currentSessionCatalog.lookupRelation(name, alias)
       } else {
-        getDataSourceSessionCatalog(name.dataSource.get).lookupRelation(name, alias)
+        val a = getDataSourceSessionCatalog(name.dataSource.get)
+        a.lookupRelation(name, alias)
       }
     }
   }
@@ -456,6 +462,10 @@ class SessionCatalog(
    */
   def isTemporaryTable(name: TableIdentifier): Boolean = synchronized {
     name.database.isEmpty && tempTables.contains(formatTableName(name.table))
+  }
+
+  def listTablesByDataSource(dataSource: String): Seq[TableIdentifier] = {
+    getDataSourceSessionCatalog(dataSource).listTables(getCurrentDatabase)
   }
 
   /**

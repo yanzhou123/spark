@@ -57,6 +57,13 @@ class CatalogImpl(sparkSession: SparkSession) extends Catalog {
   }
 
   /**
+   * List tables under certain data source.
+   */
+  def listTablesByDataSource(dataSource: String): Seq[TableIdentifier] = {
+    sessionCatalog.listTablesByDataSource(dataSource)
+  }
+
+  /**
    * Register a data source.
    */
   override def registerDataSource(externalCatalog: ExternalCatalog): Unit = {

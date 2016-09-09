@@ -43,10 +43,9 @@ import org.apache.spark.sql.types._
  * This is still used for things like creating data source tables, but in the future will be
  * cleaned up to integrate more nicely with [[HiveExternalCatalog]].
  */
-private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Logging {
+private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession,
+                                         catalog: HiveExternalCatalog) extends Logging {
   private lazy val sessionState = sparkSession.sessionState
-  private lazy val catalog = sparkSession.sharedState.internalCatalog
-    .getDataSourceCatalog("hive").get.asInstanceOf[HiveExternalCatalog]
   private val client = catalog.client
 
   /** A fully qualified identifier for a table (i.e., database.tableName) */
