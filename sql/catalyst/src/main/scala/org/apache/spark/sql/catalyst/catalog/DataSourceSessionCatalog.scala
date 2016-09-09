@@ -210,8 +210,8 @@ class DataSourceSessionCatalog(
     }
   }
 
-  override def getCurrentDataSource: String = synchronized {
-    currentDataSource
+  override final def getCurrentDataSource: String = synchronized {
+    throw new UnsupportedOperationException("getCurrentDataSource")
   }
 
   override def setCurrentDataSource(dataSource: String): Unit = {

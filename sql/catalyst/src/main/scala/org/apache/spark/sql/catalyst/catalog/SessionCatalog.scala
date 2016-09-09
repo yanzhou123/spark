@@ -129,7 +129,6 @@ class SessionCatalog(
   @GuardedBy("this")
   private[sql] val tempTables = new mutable.HashMap[String, LogicalPlan]
 
-  private[sql] def currentDataSource = _currentDataSource
   private[sql] var _currentDataSource: String = DEFAULT_DATASOURCE
 
   private[sql] def currentSessionCatalog = {
@@ -232,7 +231,7 @@ class SessionCatalog(
   }
 
   def getCurrentDataSource: String = {
-    currentSessionCatalog.getCurrentDataSource
+    _currentDataSource
   }
 
   def setCurrentDataSource(name: String): Unit = {
@@ -761,7 +760,7 @@ class SessionCatalog(
   }
 
   protected def failFunctionLookup(name: String): Nothing = {
-    throw new NoSuchFunctionException(currentDataSource, db = getCurrentDatabase, func = name)
+    throw new NoSuchFunctionException(_currentDataSource, db = getCurrentDatabase, func = name)
   }
 
   /**
@@ -861,6 +860,6 @@ class SessionCatalog(
   }
 
   private[sql] def setCurrentSessionCatalog(): Unit = {
-    _currentSessionCatalog = Some(getDataSourceSessionCatalog(currentDataSource))
+    _currentSessionCatalog = Some(getDataSourceSessionCatalog(_currentDataSource))
   }
 }

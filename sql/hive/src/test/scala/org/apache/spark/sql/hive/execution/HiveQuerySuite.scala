@@ -1121,7 +1121,7 @@ class HiveQuerySuite extends HiveComparisonTest with BeforeAndAfter {
   }
 
   test("use datasource") {
-    assert("in-memory" == sql("SELECT current_datasource()").first().getString(0))
+    assert("hive" == sql("SELECT current_datasource()").first().getString(0))
   }
 
   test("use database") {
