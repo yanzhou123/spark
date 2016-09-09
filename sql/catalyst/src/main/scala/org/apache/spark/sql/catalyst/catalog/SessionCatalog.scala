@@ -858,6 +858,10 @@ class SessionCatalog(
     internalCatalog.getSessionCatalog(dataSource, this)
   }
 
+  def getDataSourceSessionCatalog(dataSource: Option[String]): DataSourceSessionCatalog = {
+    dataSource.map(getDataSourceSessionCatalog(_)).getOrElse(_currentSessionCatalog.get)
+  }
+
   private[sql] def setCurrentSessionCatalog(): Unit = {
     _currentSessionCatalog = Some(getDataSourceSessionCatalog(_currentDataSource))
   }

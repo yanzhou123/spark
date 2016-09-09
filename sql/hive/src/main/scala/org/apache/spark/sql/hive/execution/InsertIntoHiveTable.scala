@@ -53,7 +53,8 @@ case class InsertIntoHiveTable(
   @transient private val sessionState = sqlContext.sessionState
 
   @transient private val client = sessionState.catalog
-    .getDataSourceSessionCatalog("hive").asInstanceOf[HiveSessionCatalog].client
+    .getDataSourceSessionCatalog(table.dataSource)
+    .asInstanceOf[HiveSessionCatalog].client
 
   def output: Seq[Attribute] = Seq.empty
 

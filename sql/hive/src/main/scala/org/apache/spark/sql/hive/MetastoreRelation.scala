@@ -42,7 +42,8 @@ import org.apache.spark.sql.hive.client.HiveClient
 private[hive] case class MetastoreRelation(
     databaseName: String,
     tableName: String,
-    alias: Option[String])
+    alias: Option[String],
+    dataSource: Option[String] = None)
     (val catalogTable: CatalogTable,
      @transient private val client: HiveClient,
      @transient private val sparkSession: SparkSession)

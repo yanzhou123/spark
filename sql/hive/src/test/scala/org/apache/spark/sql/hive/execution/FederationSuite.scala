@@ -29,35 +29,38 @@ class FederationSuite extends QueryTest with SQLTestUtils with TestHiveSingleton
   test("use table") {
     import org.apache.spark.sql.catalyst.catalog._
 
-//    val c1 = new InMemoryCatalog() { override val name = "abc" }
-//    spark.catalog.registerDataSource(c1)
+    val c1 = new InMemoryCatalog() { override val name = "abc" }
+    spark.catalog.registerDataSource(c1)
 
     val c2 = new HiveExternalCatalog(sparkContext) { override val name = "xyz" }
     spark.catalog.registerDataSource(c2)
 
-//    assert(spark.catalog.getDataSourceList == List("abc", "hive", "xyz"))
+    assert(spark.catalog.getDataSourceList == List("abc", "hive", "xyz"))
 
-//    sql("drop table if exists abc..t1")
+    sql("drop table if exists abc..t1")
     sql("drop table if exists xyz..t2")
 
-//    val df1 = Seq((1, 2), (3, 4), (5, 6), (7, 8)).toDF("key", "value")
-//    df1.createOrReplaceTempView("abc..t1")
+    val df1 = Seq((1, 2), (3, 4), (5, 6), (7, 8)).toDF("key", "value")
+    df1.createOrReplaceTempView("abc..t1")
 
-//    checkAnswer(sql("select * from abc..t1"),
-//      Row(1, 2) :: Row(3, 4) :: Row(5, 6) :: Row(7, 8) :: Nil)
+    checkAnswer(sql("select * from abc..t1"),
+      Row(1, 2) :: Row(3, 4) :: Row(5, 6) :: Row(7, 8) :: Nil)
 
-    sql("CREATE TABLE xyz..t2(i INT, j INT)")
+    sql("CREATE TABLE xyz..t2(key INT, value INT)")
 
-    sql("select * from xyz..t2").show
+    Seq((1, 3), (2, 4), (3, 5), (4, 6)).toDF("key", "value").write.mode("overwrite")
+      .insertInto("xyz..t2")
 
-//    spark.catalog.listTablesByDataSource("xyz").foreach(println)
+    // spark.catalog.listTablesByDataSource("xyz").foreach(println)
 
-//    Seq((1, 3), (2, 4), (3, 5), (4, 6)).toDF("key", "value")
-//      .write.mode("overwrite").insertInto("xyz..t2")
-//
-//    checkAnswer(sql("select * from xyz..t2"),
-//      Row(1, 3) :: Row(2, 4) :: Row(3, 5) :: Row(4, 6) :: Nil)
+    Seq((1, 3), (2, 4), (3, 5), (4, 6)).toDF("key", "value")
+      .write.mode("overwrite").insertInto("xyz..t2")
 
-//    sql("select tb1.key, tb2.value from abc..t1 tb1, xyz..t2 tb2 where tb1.key == tb2.key").show
+    checkAnswer(sql("select * from xyz..t2"),
+      Row(1, 3) :: Row(2, 4) :: Row(3, 5) :: Row(4, 6) :: Nil)
+
+    checkAnswer(
+      sql("select tb1.key, tb2.value from abc..t1 tb1, xyz..t2 tb2 where tb1.key == tb2.key"),
+      Row(1, 3) :: Row(3, 5) :: Nil)
   }
 }

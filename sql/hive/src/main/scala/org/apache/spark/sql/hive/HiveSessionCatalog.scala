@@ -69,7 +69,7 @@ private[sql] class HiveSessionCatalog(
     val table = formatTableName(name.table)
     if (name.database.isDefined || !tempTables.contains(table)) {
       val database = name.database.map(formatDatabaseName)
-      val newName = name.copy(database = database, table = table, dataSource = None)
+      val newName = name.copy(database = database, table = table, dataSource = name.dataSource)
       metastoreCatalog.lookupRelation(newName, alias)
     } else {
       val relation = tempTables(table)

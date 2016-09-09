@@ -181,7 +181,8 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession,
       }
     } else {
       MetastoreRelation(
-        qualifiedTableName.database, qualifiedTableName.name, alias)(table, client, sparkSession)
+        qualifiedTableName.database, qualifiedTableName.name, alias,
+        Some(catalog.name))(table, client, sparkSession)
     }
   }
 
