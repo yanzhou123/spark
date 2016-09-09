@@ -51,7 +51,8 @@ case class CreateDatabaseCommand(
     ifNotExists: Boolean,
     path: Option[String],
     comment: Option[String],
-    props: Map[String, String])
+    props: Map[String, String],
+    dataSource: Option[String] = None)
   extends RunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
@@ -89,7 +90,8 @@ case class CreateDatabaseCommand(
 case class DropDatabaseCommand(
     databaseName: String,
     ifExists: Boolean,
-    cascade: Boolean)
+    cascade: Boolean,
+    dataSource: Option[String] = None)
   extends RunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
@@ -111,7 +113,8 @@ case class DropDatabaseCommand(
  */
 case class AlterDatabasePropertiesCommand(
     databaseName: String,
-    props: Map[String, String])
+    props: Map[String, String],
+    dataSource: Option[String] = None)
   extends RunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
@@ -137,7 +140,8 @@ case class AlterDatabasePropertiesCommand(
  */
 case class DescribeDatabaseCommand(
     databaseName: String,
-    extended: Boolean)
+    extended: Boolean,
+    dataSource: Option[String] = None)
   extends RunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {

@@ -431,8 +431,7 @@ class SessionCatalog(
       if (name.dataSource.isEmpty) {
         currentSessionCatalog.lookupRelation(name, alias)
       } else {
-        val a = getDataSourceSessionCatalog(name.dataSource.get)
-        a.lookupRelation(name, alias)
+        getDataSourceSessionCatalog(name.dataSource.get).lookupRelation(name, alias)
       }
     }
   }

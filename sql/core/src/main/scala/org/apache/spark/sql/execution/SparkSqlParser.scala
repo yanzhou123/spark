@@ -110,7 +110,8 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
    * Create a [[SetDatabaseCommand]] logical plan.
    */
   override def visitUse(ctx: UseContext): LogicalPlan = withOrigin(ctx) {
-    SetDatabaseCommand(ctx.db.getText)
+    SetDatabaseCommand(ctx.databaseIdentifier.db.getText,
+      Option(ctx.databaseIdentifier.datasource).map(_.getText))
   }
 
   /**
@@ -471,11 +472,12 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
    */
   override def visitCreateDatabase(ctx: CreateDatabaseContext): LogicalPlan = withOrigin(ctx) {
     CreateDatabaseCommand(
-      ctx.identifier.getText,
+      ctx.databaseIdentifier.db.getText,
       ctx.EXISTS != null,
       Option(ctx.locationSpec).map(visitLocationSpec),
       Option(ctx.comment).map(string),
-      Option(ctx.tablePropertyList).map(visitPropertyKeyValues).getOrElse(Map.empty))
+      Option(ctx.tablePropertyList).map(visitPropertyKeyValues).getOrElse(Map.empty),
+      Option(ctx.databaseIdentifier.datasource).map(_.getText))
   }
 
   /**
@@ -489,8 +491,8 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
   override def visitSetDatabaseProperties(
       ctx: SetDatabasePropertiesContext): LogicalPlan = withOrigin(ctx) {
     AlterDatabasePropertiesCommand(
-      ctx.identifier.getText,
-      visitPropertyKeyValues(ctx.tablePropertyList))
+      ctx.databaseIdentifier.db.getText, visitPropertyKeyValues(ctx.tablePropertyList),
+      Option(ctx.databaseIdentifier.datasource).map(_.getText))
   }
 
   /**
@@ -502,7 +504,8 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
    * }}}
    */
   override def visitDropDatabase(ctx: DropDatabaseContext): LogicalPlan = withOrigin(ctx) {
-    DropDatabaseCommand(ctx.identifier.getText, ctx.EXISTS != null, ctx.CASCADE != null)
+    DropDatabaseCommand(ctx.databaseIdentifier.db.getText, ctx.EXISTS != null,
+      ctx.CASCADE != null, Option(ctx.databaseIdentifier.datasource).map(_.getText))
   }
 
   /**
@@ -514,7 +517,8 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder {
    * }}}
    */
   override def visitDescribeDatabase(ctx: DescribeDatabaseContext): LogicalPlan = withOrigin(ctx) {
-    DescribeDatabaseCommand(ctx.identifier.getText, ctx.EXTENDED != null)
+    DescribeDatabaseCommand(ctx.databaseIdentifier.db.getText, ctx.EXTENDED != null,
+      Option(ctx.databaseIdentifier.datasource).map(_.getText))
   }
 
   /**
