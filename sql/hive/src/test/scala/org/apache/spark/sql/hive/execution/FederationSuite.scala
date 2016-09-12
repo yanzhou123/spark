@@ -37,21 +37,21 @@ class FederationSuite extends QueryTest with SQLTestUtils with TestHiveSingleton
 
     assert(spark.catalog.getDataSourceList == List("abc", "hive", "xyz"))
 
-    sql("drop table if exists t1")
+    sql("drop table if exists hive..t1")
     sql("drop table if exists xyz..t2")
 
-    val df1 = Seq((1, 2), (3, 4), (5, 6), (7, 8)).toDF("key", "value")
-    df1.createOrReplaceTempView("t1")
-
-    checkAnswer(sql("select * from t1"),
-      Row(1, 2) :: Row(3, 4) :: Row(5, 6) :: Row(7, 8) :: Nil)
+    sql("CREATE TABLE hive..t1(key INT, value INT)")
 
     sql("CREATE TABLE xyz..t2(key INT, value INT)")
 
+    assert(spark.catalog.listTablesByDataSource("hive").map(_.table) == Seq("t1"))
+    assert(spark.catalog.listTablesByDataSource("xyz").map(_.table) == Seq("t2"))
+
+    Seq((1, 2), (3, 4), (5, 6), (7, 8)).toDF("key", "value").write.mode("overwrite")
+      .insertInto("hive..t1")
+
     Seq((1, 3), (2, 4), (3, 5), (4, 6)).toDF("key", "value").write.mode("overwrite")
       .insertInto("xyz..t2")
-
-    // spark.catalog.listTablesByDataSource("xyz").foreach(println)
 
     Seq((1, 3), (2, 4), (3, 5), (4, 6)).toDF("key", "value")
       .write.mode("overwrite").insertInto("xyz..t2")
