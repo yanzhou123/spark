@@ -44,14 +44,14 @@ import org.apache.spark.sql.types._
  * cleaned up to integrate more nicely with [[HiveExternalCatalog]].
  */
 private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession,
-                                         catalog: HiveExternalCatalog) extends Logging {
+                                         catalog: HiveSessionCatalog) extends Logging {
   private lazy val sessionState = sparkSession.sessionState
-  private val client = catalog.client
+  private val client = catalog.externalCatalog.asInstanceOf[HiveExternalCatalog].client
 
   /** A fully qualified identifier for a table (i.e., database.tableName) */
   case class QualifiedTableName(database: String, name: String)
 
-  private def getCurrentDatabase: String = sessionState.catalog.getCurrentDatabase
+  private def getCurrentDatabase: String = catalog.getCurrentDatabase
 
   def getQualifiedTableName(tableIdent: TableIdentifier): QualifiedTableName = {
     QualifiedTableName(
@@ -182,7 +182,7 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession,
     } else {
       MetastoreRelation(
         qualifiedTableName.database, qualifiedTableName.name, alias,
-        Some(catalog.name))(table, client, sparkSession)
+        Some(catalog.externalCatalog.name))(table, client, sparkSession)
     }
   }
 

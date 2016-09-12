@@ -30,17 +30,17 @@ class FederationSuite  extends QueryTest with SharedSQLContext {
     assert(spark.catalog.getDataSourceList == List("abc", "in-memory"))
 
     val df1 = Seq((1, 2), (3, 4), (5, 6), (7, 8)).toDF("key", "value")
-    df1.createOrReplaceTempView("abc..t1")
+    df1.createOrReplaceTempView("t1")
 
-    checkAnswer(sql("select * from abc..t1"),
+    checkAnswer(sql("select * from t1"),
       Row(1, 2) :: Row(3, 4) :: Row(5, 6) :: Row(7, 8) :: Nil)
 
     val df2 = Seq((1, 3), (2, 4), (3, 5), (4, 6)).toDF("key", "value")
-    df2.createOrReplaceTempView("abc..t2")
+    df2.createOrReplaceTempView("t2")
 
-    checkAnswer(sql("select * from abc..t2"),
+    checkAnswer(sql("select * from t2"),
       Row(1, 3) :: Row(2, 4) :: Row(3, 5) :: Row(4, 6) :: Nil)
 
-    sql("select tb1.key, tb2.value from abc..t1 tb1, abc..t2 tb2 where tb1.key == tb2.key").show
+    sql("select tb1.key, tb2.value from t1 tb1, t2 tb2 where tb1.key == tb2.key").show
   }
 }

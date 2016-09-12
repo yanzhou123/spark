@@ -67,17 +67,9 @@ private[sql] class HiveSessionCatalog(
 
   override def lookupRelation(name: TableIdentifier, alias: Option[String]): LogicalPlan = {
     val table = formatTableName(name.table)
-    if (name.database.isDefined || !tempTables.contains(table)) {
-      val database = name.database.map(formatDatabaseName)
-      val newName = name.copy(database = database, table = table, dataSource = name.dataSource)
-      metastoreCatalog.lookupRelation(newName, alias)
-    } else {
-      val relation = tempTables(table)
-      val tableWithQualifiers = SubqueryAlias(table, relation)
-      // If an alias was specified by the lookup, wrap the plan in a subquery so that
-      // attributes are properly qualified with this alias.
-      alias.map(a => SubqueryAlias(a, tableWithQualifiers)).getOrElse(tableWithQualifiers)
-    }
+    val database = name.database.map(formatDatabaseName)
+    val newName = name.copy(database = database, table = table, dataSource = name.dataSource)
+    metastoreCatalog.lookupRelation(newName, alias)
   }
 
   // ----------------------------------------------------------------
@@ -88,7 +80,7 @@ private[sql] class HiveSessionCatalog(
   // essentially a cache for metastore tables. However, it relies on a lot of session-specific
   // things so it would be a lot of work to split its functionality between HiveSessionCatalog
   // and HiveCatalog. We should still do it at some point...
-  private val metastoreCatalog = new HiveMetastoreCatalog(sparkSession, externalCatalog)
+  private val metastoreCatalog = new HiveMetastoreCatalog(sparkSession, this)
 
   val ParquetConversions: Rule[LogicalPlan] = metastoreCatalog.ParquetConversions
   val OrcConversions: Rule[LogicalPlan] = metastoreCatalog.OrcConversions
@@ -283,13 +275,13 @@ private[sql] class HiveSessionCatalog(
   }
 
   override lazy val analyzer: Analyzer = {
-    new Analyzer(sparkSession.sessionState.catalog, conf) {
+    new Analyzer(this, conf) {
       override val extendedResolutionRules =
         ParquetConversions :: OrcConversions :: CreateTables :: Nil
     }
   }
 
-  override lazy val optimizer: Optimizer = new SparkOptimizer(sparkSession.sessionState.catalog,
+  override lazy val optimizer: Optimizer = new SparkOptimizer(this,
     conf, new ExperimentalMethods) {
     override def batches: Seq[Batch] = Nil
   }

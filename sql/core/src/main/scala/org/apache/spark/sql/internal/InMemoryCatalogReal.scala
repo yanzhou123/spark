@@ -41,12 +41,12 @@ class InMemoryCatalogReal(hadoopConfig: Configuration = new Configuration)
       sessionCatalog.functionResourceLoader, sessionCatalog.functionRegistry,
       sessionCatalog.conf, sessionCatalog.hadoopConf) {
 
-      override lazy val analyzer: Analyzer = new Analyzer(sessionCatalog, conf) {
+      override lazy val analyzer: Analyzer = new Analyzer(this, conf) {
         override val extendedResolutionRules = Nil
         override val extendedCheckRules = Nil
       }
 
-      override lazy val optimizer: Optimizer = new SparkOptimizer(sessionCatalog,
+      override lazy val optimizer: Optimizer = new SparkOptimizer(this,
         sessionCatalog.conf.asInstanceOf[SQLConf], new ExperimentalMethods) {
         override def batches = Nil
       }

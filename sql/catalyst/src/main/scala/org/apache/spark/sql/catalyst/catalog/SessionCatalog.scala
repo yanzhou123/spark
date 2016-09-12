@@ -31,7 +31,8 @@ import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.analysis.FunctionRegistry.FunctionBuilder
 import org.apache.spark.sql.catalyst.expressions.{Expression, ExpressionInfo}
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias}
+import org.apache.spark.sql.catalyst.util.StringUtils
 
 object SessionCatalog {
   val DEFAULT_DATABASE = "default"
@@ -127,7 +128,7 @@ class SessionCatalog(
 
   /** List of temporary tables, mapping from table name to their logical plan. */
   @GuardedBy("this")
-  private[sql] val tempTables = new mutable.HashMap[String, LogicalPlan]
+  protected val tempTables = new mutable.HashMap[String, LogicalPlan]
 
   private[sql] var _currentDataSource: String = DEFAULT_DATASOURCE
 
@@ -185,10 +186,6 @@ class SessionCatalog(
   // All methods in this category interact directly with the underlying catalog.
   // ----------------------------------------------------------------------------
 
-  def getTablesByDataSource(dataSource: String): Seq[TableIdentifier] = {
-    getDataSourceSessionCatalog(dataSource).listTables(getCurrentDatabase)
-  }
-
   def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = {
     currentSessionCatalog.createDatabase(dbDefinition, ignoreIfExists)
   }
@@ -222,6 +219,8 @@ class SessionCatalog(
   }
 
   def getCurrentDatabase: String = {
+    // caution: has to be used with the current data source properly set up
+    // Otherwise may experience inconsistent meta data objects
     currentSessionCatalog.getCurrentDatabase
   }
 
@@ -300,7 +299,25 @@ class SessionCatalog(
    * If the specified table is not found in the database then a [[NoSuchTableException]] is thrown.
    */
   def getTableMetadata(name: TableIdentifier): CatalogTable = {
-    if (name.dataSource.isEmpty) {
+    val db = formatDatabaseName(name.database.getOrElse(getCurrentDatabase))
+    val table = formatTableName(name.table)
+    val tid = TableIdentifier(table)
+    if (isTemporaryTable(name)) {
+      CatalogTable(
+        identifier = tid,
+        tableType = CatalogTableType.VIEW,
+        storage = CatalogStorageFormat.empty,
+        schema = tempTables(table).output.map { c =>
+          CatalogColumn(
+            name = c.name,
+            dataType = c.dataType.catalogString,
+            nullable = c.nullable,
+            comment = Option(c.name)
+          )
+        },
+        properties = Map(),
+        viewText = None)
+    } else if (name.dataSource.isEmpty) {
       currentSessionCatalog.getTableMetadata(name)
     } else {
       getDataSourceSessionCatalog(name.dataSource.get).getTableMetadata(name)
@@ -395,12 +412,32 @@ class SessionCatalog(
    * This assumes the database specified in `oldName` matches the one specified in `newName`.
    */
   def renameTable(oldName: TableIdentifier, newName: TableIdentifier): Unit = synchronized {
-    require(oldName.dataSource == newName.dataSource,
-      "data source should be same for renaming the table")
-    if (oldName.dataSource.isEmpty) {
-      currentSessionCatalog.renameTable(oldName, newName)
+    val oldTableName = formatTableName(oldName.table)
+    val newTableName = formatTableName(newName.table)
+    if (!oldName.dataSource.isDefined && !oldName.database.isDefined &&
+      tempTables.contains(oldTableName)) {
+      if (newName.database.isDefined) {
+        throw new AnalysisException(
+          s"RENAME TEMPORARY TABLE from '$oldName' to '$newName': cannot specify database " +
+            s"name '${newName.database.get}' in the destination table")
+      }
+      if (tempTables.contains(newTableName)) {
+        throw new AnalysisException(
+          s"RENAME TEMPORARY TABLE from '$oldName' to '$newName': destination table already exists")
+      }
+      val table = tempTables(oldTableName)
+      tempTables.remove(oldTableName)
+      tempTables.put(newTableName, table)
     } else {
-      getDataSourceSessionCatalog(oldName.dataSource.get).renameTable(oldName, newName)
+      val oldDataSource = oldName.dataSource.getOrElse(_currentDataSource)
+      val newDataSource = newName.dataSource.getOrElse(_currentDataSource)
+      require(oldDataSource == newDataSource,
+        "data source should be same for renaming the table")
+      if (oldName.dataSource.isEmpty) {
+        currentSessionCatalog.renameTable(oldName, newName)
+      } else {
+        getDataSourceSessionCatalog(oldName.dataSource.get).renameTable(oldName, newName)
+      }
     }
   }
 
@@ -412,10 +449,16 @@ class SessionCatalog(
    * the same name, then, if that does not exist, drop the table from the current database.
    */
   def dropTable(name: TableIdentifier, ignoreIfNotExists: Boolean): Unit = synchronized {
-    if (name.dataSource.isEmpty) {
-      currentSessionCatalog.dropTable(name, ignoreIfNotExists)
+    val table = formatTableName(name.table)
+    if (!name.dataSource.isDefined && !name.database.isDefined && tempTables.contains(table)) {
+      val table = formatTableName(name.table)
+      tempTables.remove(table)
     } else {
-      getDataSourceSessionCatalog(name.dataSource.get).dropTable(name, ignoreIfNotExists)
+      if (name.dataSource.isEmpty) {
+        currentSessionCatalog.dropTable(name, ignoreIfNotExists)
+      } else {
+        getDataSourceSessionCatalog(name.dataSource.get).dropTable(name, ignoreIfNotExists)
+      }
     }
   }
 
@@ -428,7 +471,15 @@ class SessionCatalog(
    */
   def lookupRelation(name: TableIdentifier, alias: Option[String] = None): LogicalPlan = {
     synchronized {
-      if (name.dataSource.isEmpty) {
+      val table = formatTableName(name.table)
+      if (!name.dataSource.isDefined && !name.database.isDefined &&
+        tempTables.contains(table)) {
+        val relation = tempTables(table)
+        val qualifiedTable = SubqueryAlias(table, relation)
+        // If an alias was specified by the lookup, wrap the plan in a subquery so that
+        // attributes are properly qualified with this alias.
+        alias.map(a => SubqueryAlias(a, qualifiedTable)).getOrElse(qualifiedTable)
+      } else if (name.dataSource.isEmpty) {
         currentSessionCatalog.lookupRelation(name, alias)
       } else {
         getDataSourceSessionCatalog(name.dataSource.get).lookupRelation(name, alias)
@@ -445,7 +496,9 @@ class SessionCatalog(
    * contain the table.
    */
   def tableExists(name: TableIdentifier): Boolean = synchronized {
-    if (name.dataSource.isEmpty) {
+    if (isTemporaryTable(name)) {
+      true
+    } else if (name.dataSource.isEmpty) {
       currentSessionCatalog.tableExists(name)
     } else {
       getDataSourceSessionCatalog(name.dataSource.get).tableExists(name)
@@ -459,11 +512,13 @@ class SessionCatalog(
    * explicitly specified.
    */
   def isTemporaryTable(name: TableIdentifier): Boolean = synchronized {
-    name.database.isEmpty && tempTables.contains(formatTableName(name.table))
+    name.dataSource.isEmpty && name.database.isEmpty &&
+      tempTables.contains(formatTableName(name.table))
   }
 
   def listTablesByDataSource(dataSource: String): Seq[TableIdentifier] = {
-    getDataSourceSessionCatalog(dataSource).listTables(getCurrentDatabase)
+    val ds = getDataSourceSessionCatalog(dataSource)
+    ds.listTables(ds.getCurrentDatabase)
   }
 
   /**
@@ -475,14 +530,21 @@ class SessionCatalog(
    * List all matching tables in the specified database, including temporary tables.
    */
   def listTables(db: String, pattern: String): Seq[TableIdentifier] = {
-    // requireDbExists(dbName)
-    currentSessionCatalog.listTables(db, pattern)
+    currentSessionCatalog.listTables(db, pattern) ++
+      synchronized {
+        val _tempTables = StringUtils.filterPattern(tempTables.keys.toSeq, pattern)
+          .map { t => TableIdentifier(t) }
+        _tempTables
+      }
   }
 
   /**
    * Refresh the cache entry for a metastore table, if any.
    */
   def refreshTable(name: TableIdentifier): Unit = {
+    if (name.dataSource.isEmpty && name.database.isEmpty) {
+      tempTables.get(name.table).foreach(_.refresh())
+    }
     if (name.dataSource.isEmpty) {
       currentSessionCatalog.refreshTable(name)
     } else {

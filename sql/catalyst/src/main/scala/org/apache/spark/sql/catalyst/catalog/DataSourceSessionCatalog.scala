@@ -70,8 +70,6 @@ class DataSourceSessionCatalog(
       parent.functionRegistry, parent.conf, parent.hadoopConf)
   }
 
-  override val tempTables = parent.tempTables
-
   // Note: we track current database here because certain operations do not explicitly
   // specify the database (e.g. DROP TABLE my_table). In these cases we must first
   // check whether the temporary table or function exists, then, if not, operate on
@@ -279,27 +277,9 @@ class DataSourceSessionCatalog(
   override def getTableMetadata(name: TableIdentifier): CatalogTable = {
     val db = formatDatabaseName(name.database.getOrElse(getCurrentDatabase))
     val table = formatTableName(name.table)
-    val tid = TableIdentifier(table)
-    if (isTemporaryTable(name)) {
-      CatalogTable(
-        identifier = tid,
-        tableType = CatalogTableType.VIEW,
-        storage = CatalogStorageFormat.empty,
-        schema = tempTables(table).output.map { c =>
-          CatalogColumn(
-            name = c.name,
-            dataType = c.dataType.catalogString,
-            nullable = c.nullable,
-            comment = Option(c.name)
-          )
-        },
-        properties = Map(),
-        viewText = None)
-    } else {
-      requireDbExists(db)
-      requireTableExists(TableIdentifier(table, Some(db)))
-      externalCatalog.getTable(TableIdentifier(table, Some(db)))
-    }
+    requireDbExists(db)
+    requireTableExists(TableIdentifier(table, Some(db)))
+    externalCatalog.getTable(TableIdentifier(table, Some(db)))
   }
 
   /**
@@ -384,24 +364,9 @@ class DataSourceSessionCatalog(
     }
     val oldTableName = formatTableName(oldName.table)
     val newTableName = formatTableName(newName.table)
-    if (oldName.database.isDefined || !tempTables.contains(oldTableName)) {
-      requireTableExists(TableIdentifier(oldTableName, Some(db)))
-      requireTableNotExists(TableIdentifier(newTableName, Some(db)))
-      externalCatalog.renameTable(TableIdentifier(oldTableName, Some(db)), newTableName)
-    } else {
-      if (newName.database.isDefined) {
-        throw new AnalysisException(
-          s"RENAME TEMPORARY TABLE from '$oldName' to '$newName': cannot specify database " +
-            s"name '${newName.database.get}' in the destination table")
-      }
-      if (tempTables.contains(newTableName)) {
-        throw new AnalysisException(
-          s"RENAME TEMPORARY TABLE from '$oldName' to '$newName': destination table already exists")
-      }
-      val table = tempTables(oldTableName)
-      tempTables.remove(oldTableName)
-      tempTables.put(newTableName, table)
-    }
+    requireTableExists(TableIdentifier(oldTableName, Some(db)))
+    requireTableNotExists(TableIdentifier(newTableName, Some(db)))
+    externalCatalog.renameTable(TableIdentifier(oldTableName, Some(db)), newTableName)
   }
 
   /**
@@ -414,17 +379,13 @@ class DataSourceSessionCatalog(
   override def dropTable(name: TableIdentifier, ignoreIfNotExists: Boolean): Unit = synchronized {
     val db = formatDatabaseName(name.database.getOrElse(currentDb))
     val table = formatTableName(name.table)
-    if (name.database.isDefined || !tempTables.contains(table)) {
-      requireDbExists(db)
-      // When ignoreIfNotExists is false, no exception is issued when the table does not exist.
-      // Instead, log it as an error message.
-      if (tableExists(TableIdentifier(table, Option(db)))) {
-        externalCatalog.dropTable(TableIdentifier(table, Some(db)), ignoreIfNotExists = true)
-      } else if (!ignoreIfNotExists) {
-        throw new NoSuchTableException(db = db, table = table)
-      }
-    } else {
-      tempTables.remove(table)
+    requireDbExists(db)
+    // When ignoreIfNotExists is false, no exception is issued when the table does not exist.
+    // Instead, log it as an error message.
+    if (tableExists(TableIdentifier(table, Option(db)))) {
+      externalCatalog.dropTable(TableIdentifier(table, Some(db)), ignoreIfNotExists = true)
+    } else if (!ignoreIfNotExists) {
+      throw new NoSuchTableException(db = db, table = table)
     }
   }
 
@@ -439,13 +400,10 @@ class DataSourceSessionCatalog(
     synchronized {
       val db = formatDatabaseName(name.database.getOrElse(currentDb))
       val table = formatTableName(name.table)
-      val relation =
-        if (name.database.isDefined || !tempTables.contains(table)) {
-          val metadata = externalCatalog.getTable(TableIdentifier(table, Some(db)))
-          SimpleCatalogRelation(db, metadata, alias)
-        } else {
-          tempTables(table)
-        }
+      val relation = {
+        val metadata = externalCatalog.getTable(TableIdentifier(table, Some(db)))
+        SimpleCatalogRelation(db, metadata, alias)
+      }
       val qualifiedTable = SubqueryAlias(table, relation)
       // If an alias was specified by the lookup, wrap the plan in a subquery so that
       // attributes are properly qualified with this alias.
@@ -464,21 +422,7 @@ class DataSourceSessionCatalog(
   override def tableExists(name: TableIdentifier): Boolean = synchronized {
     val db = formatDatabaseName(name.database.getOrElse(currentDb))
     val table = formatTableName(name.table)
-    if (isTemporaryTable(name)) {
-      true
-    } else {
-      externalCatalog.tableExists(TableIdentifier(table, Some(db)))
-    }
-  }
-
-  /**
-   * Return whether a table with the specified name is a temporary table.
-   *
-   * Note: The temporary table cache is checked only when database is not
-   * explicitly specified.
-   */
-  override def isTemporaryTable(name: TableIdentifier): Boolean = synchronized {
-    name.database.isEmpty && tempTables.contains(formatTableName(name.table))
+    externalCatalog.tableExists(TableIdentifier(table, Some(db)))
   }
 
   /**
@@ -492,23 +436,11 @@ class DataSourceSessionCatalog(
   override def listTables(db: String, pattern: String): Seq[TableIdentifier] = {
     val dbName = formatDatabaseName(db)
     requireDbExists(dbName)
-    val dbTables =
-      externalCatalog.listTables(dbName, pattern)
-        .map { t => TableIdentifier(t, Some(dbName)) }
-    synchronized {
-      val _tempTables = StringUtils.filterPattern(tempTables.keys.toSeq, pattern)
-        .map { t => TableIdentifier(t) }
-      dbTables ++ _tempTables
-    }
+    externalCatalog.listTables(dbName, pattern)
+      .map { t => TableIdentifier(t, Some(dbName)) }
   }
 
   override def refreshTable(name: TableIdentifier): Unit = {
-    // Go through temporary tables and invalidate them.
-    // If the database is defined, this is definitely not a temp table.
-    // If the database is not defined, there is a good chance this is a temp table.
-    if (name.database.isEmpty) {
-      tempTables.get(name.table).foreach(_.refresh())
-    }
   }
 
   // ----------------------------------------------------------------------------

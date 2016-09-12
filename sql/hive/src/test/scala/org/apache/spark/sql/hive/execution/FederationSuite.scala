@@ -37,13 +37,13 @@ class FederationSuite extends QueryTest with SQLTestUtils with TestHiveSingleton
 
     assert(spark.catalog.getDataSourceList == List("abc", "hive", "xyz"))
 
-    sql("drop table if exists abc..t1")
+    sql("drop table if exists t1")
     sql("drop table if exists xyz..t2")
 
     val df1 = Seq((1, 2), (3, 4), (5, 6), (7, 8)).toDF("key", "value")
-    df1.createOrReplaceTempView("abc..t1")
+    df1.createOrReplaceTempView("t1")
 
-    checkAnswer(sql("select * from abc..t1"),
+    checkAnswer(sql("select * from t1"),
       Row(1, 2) :: Row(3, 4) :: Row(5, 6) :: Row(7, 8) :: Nil)
 
     sql("CREATE TABLE xyz..t2(key INT, value INT)")
@@ -60,7 +60,7 @@ class FederationSuite extends QueryTest with SQLTestUtils with TestHiveSingleton
       Row(1, 3) :: Row(2, 4) :: Row(3, 5) :: Row(4, 6) :: Nil)
 
     checkAnswer(
-      sql("select tb1.key, tb2.value from abc..t1 tb1, xyz..t2 tb2 where tb1.key == tb2.key"),
+      sql("select tb1.key, tb2.value from t1 tb1, xyz..t2 tb2 where tb1.key == tb2.key"),
       Row(1, 3) :: Row(3, 5) :: Nil)
   }
 }

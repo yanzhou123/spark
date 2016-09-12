@@ -82,6 +82,12 @@ case class CreateViewCommand(
       s"It is not allowed to add database prefix `$database` for the TEMPORARY view name.")
   }
 
+  if (isTemporary && tableDesc.identifier.dataSource.isDefined) {
+    val dataSource = tableDesc.identifier.dataSource.get
+    throw new AnalysisException(
+      s"It is not allowed to add data source prefix `$dataSource` for the TEMPORARY view name.")
+  }
+
   override def run(sparkSession: SparkSession): Seq[Row] = {
     // If the plan cannot be analyzed, throw an exception and don't proceed.
     val qe = sparkSession.sessionState.executePlan(child)
