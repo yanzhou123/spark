@@ -64,6 +64,13 @@ class CatalogImpl(sparkSession: SparkSession) extends Catalog {
   }
 
   /**
+   * Unregister a data source.
+   */
+  override def unregisterDataSource(name: String): Option[ExternalCatalog] = {
+    sparkSession.sharedState.internalCatalog.unregisterDataSource(name)
+  }
+
+  /**
    * Register a data source.
    */
   override def registerDataSource(externalCatalog: ExternalCatalog): Unit = {

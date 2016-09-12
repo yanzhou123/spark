@@ -68,6 +68,15 @@ class InternalCatalog extends Serializable {
   }
 
   /**
+   * To unregister a data source
+   * @param name the name of the data source
+   * @return the removed data source or None if it does not exists
+   */
+  def unregisterDataSource(name: String): Option[ExternalCatalog] = {
+    externalCatalogMap.remove(name)
+  }
+
+  /**
    * To register pre-built data sources such as Hive and In-Memory
    * @param externalCatalog external catalog
    */
