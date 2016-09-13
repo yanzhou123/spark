@@ -357,19 +357,15 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession,
    */
   object ParquetConversions extends Rule[LogicalPlan] {
     private def shouldConvertMetastoreParquet(relation: MetastoreRelation): Boolean = {
-      val sessionCatalog = sparkSession.sharedState.internalCatalog
-        .getSessionCatalog("hive", sessionState.catalog).asInstanceOf[HiveSessionCatalog]
       relation.tableDesc.getSerdeClassName.toLowerCase.contains("parquet") &&
-        sessionCatalog.convertMetastoreParquet
+        catalog.convertMetastoreParquet
     }
 
     private def convertToParquetRelation(relation: MetastoreRelation): LogicalRelation = {
       val defaultSource = new ParquetFileFormat()
       val fileFormatClass = classOf[ParquetFileFormat]
-      val sessionCatalog = sparkSession.sharedState.internalCatalog
-        .getSessionCatalog("hive", sessionState.catalog).asInstanceOf[HiveSessionCatalog]
 
-      val mergeSchema = sessionCatalog.convertMetastoreParquetWithSchemaMerging
+      val mergeSchema = catalog.convertMetastoreParquetWithSchemaMerging
       val options = Map(ParquetOptions.MERGE_SCHEMA -> mergeSchema.toString)
 
       convertToLogicalRelation(relation, options, defaultSource, fileFormatClass, "parquet")
@@ -407,10 +403,8 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession,
    */
   object OrcConversions extends Rule[LogicalPlan] {
     private def shouldConvertMetastoreOrc(relation: MetastoreRelation): Boolean = {
-      val sessionCatalog = sparkSession.sharedState.internalCatalog
-        .getSessionCatalog("hive", sessionState.catalog).asInstanceOf[HiveSessionCatalog]
       relation.tableDesc.getSerdeClassName.toLowerCase.contains("orc") &&
-        sessionCatalog.convertMetastoreOrc
+        catalog.convertMetastoreOrc
     }
 
     private def convertToOrcRelation(relation: MetastoreRelation): LogicalRelation = {
