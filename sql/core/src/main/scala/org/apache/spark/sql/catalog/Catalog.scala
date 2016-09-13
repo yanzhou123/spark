@@ -36,6 +36,11 @@ abstract class Catalog {
   def listTablesByDataSource(dataSource: String): Seq[TableIdentifier]
 
   /**
+   * Unregister a data source.
+   */
+  def unregisterDataSource(name: String): Option[ExternalCatalog]
+
+  /**
    * Register a data source.
    */
   def registerDataSource(externalCatalog: ExternalCatalog): Unit
