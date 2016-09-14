@@ -38,7 +38,6 @@ class InMemoryCatalogReal(hadoopConfig: Configuration = new Configuration)
     extends InMemoryCatalog(hadoopConfig) {
   override def getSessionCatalog(sessionCatalog: SessionCatalog): DataSourceSessionCatalog =
     new DataSourceSessionCatalog(sessionCatalog, this,
-      sessionCatalog.functionResourceLoader, sessionCatalog.functionRegistry,
       sessionCatalog.conf, sessionCatalog.hadoopConf) {
 
       override lazy val analyzer: Analyzer = new Analyzer(this, conf) {

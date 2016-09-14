@@ -311,7 +311,7 @@ class SQLQuerySuite extends QueryTest with SQLTestUtils with TestHiveSingleton {
         Row(3) :: Row(3) :: Nil)
 
       checkKeywordsExist(sql("describe function udtf_count"),
-        "Function: default.udtf_count",
+        "Function: hive.default.udtf_count",
         "Class: org.apache.spark.sql.hive.execution.GenericUDTFCount2",
         "Usage: N/A")
     }

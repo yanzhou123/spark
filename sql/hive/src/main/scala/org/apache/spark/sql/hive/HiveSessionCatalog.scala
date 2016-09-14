@@ -46,15 +46,11 @@ private[sql] class HiveSessionCatalog(
     externalCatalog: HiveExternalCatalog,
     private[hive] val client: HiveClient,
     sparkSession: SparkSession,
-    functionResourceLoader: FunctionResourceLoader,
-    functionRegistry: FunctionRegistry,
     conf: SQLConf,
     hadoopConf: Configuration)
   extends DataSourceSessionCatalog(
     sparkSession.sessionState.catalog,
     externalCatalog,
-    functionResourceLoader,
-    functionRegistry,
     conf,
     hadoopConf) {
 

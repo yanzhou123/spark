@@ -743,10 +743,27 @@ class SessionCatalog(
    * If no database is specified, assume the function is in the current database.
    */
   def dropFunction(name: FunctionIdentifier, ignoreIfNotExists: Boolean): Unit = {
-    if (name.dataSource.isEmpty) {
-      currentSessionCatalog.dropFunction(name, ignoreIfNotExists)
-    } else {
-      getDataSourceSessionCatalog(name.dataSource.get).dropFunction(name, ignoreIfNotExists)
+    val datasource = name.dataSource.orElse(Some(_currentDataSource))
+    val db = formatDatabaseName(name.database.getOrElse(
+      getDataSourceSessionCatalog(datasource.get).getCurrentDatabase))
+    val identifier = name.copy(database = Some(db))
+    if (functionExists(identifier)) {
+      // TODO: registry should just take in FunctionIdentifier for type safety
+      if (functionRegistry.functionExists(identifier.unquotedString)) {
+        // If we have loaded this function into the FunctionRegistry,
+        // also drop it from there.
+        // For a permanent function, because we loaded it to the FunctionRegistry
+        // when it's first used, we also need to drop it from the FunctionRegistry.
+        functionRegistry.dropFunction(identifier.unquotedString)
+      }
+      if (name.dataSource.isEmpty) {
+        currentSessionCatalog.dropFunction(name, ignoreIfNotExists)
+      } else {
+        getDataSourceSessionCatalog(name.dataSource.get).dropFunction(name, ignoreIfNotExists)
+      }
+    } else if (!ignoreIfNotExists) {
+      throw new NoSuchFunctionException(datasource =
+        name.dataSource.getOrElse(_currentDataSource), db = db, func = identifier.toString)
     }
   }
 
@@ -768,10 +785,12 @@ class SessionCatalog(
    * Check if the specified function exists.
    */
   def functionExists(name: FunctionIdentifier): Boolean = {
-    if (name.dataSource.isEmpty) {
-      currentSessionCatalog.functionExists(name)
-    } else {
-      getDataSourceSessionCatalog(name.dataSource.get).functionExists(name)
+    functionRegistry.functionExists(name.unquotedString) || {
+      if (name.dataSource.isEmpty) {
+        currentSessionCatalog.functionExists(name)
+      } else {
+        getDataSourceSessionCatalog(name.dataSource.get).functionExists(name)
+      }
     }
   }
 
@@ -828,11 +847,20 @@ class SessionCatalog(
    * Look up the [[ExpressionInfo]] associated with the specified function, assuming it exists.
    */
   private[spark] def lookupFunctionInfo(name: FunctionIdentifier): ExpressionInfo = synchronized {
-    if (name.dataSource.isEmpty) {
-      currentSessionCatalog.lookupFunctionInfo(name)
-    } else {
-      getDataSourceSessionCatalog(name.dataSource.get).lookupFunctionInfo(name)
-    }
+    // TODO: just make function registry take in FunctionIdentifier instead of duplicating this
+    val datasource = name.dataSource.orElse(Some(_currentDataSource))
+    val database = name.database.orElse(
+      Some(getDataSourceSessionCatalog(datasource).getCurrentDatabase)).map(formatDatabaseName)
+    val qualifiedName = name.copy(dataSource = datasource, database = database)
+    functionRegistry.lookupFunction(name.funcName)
+      .orElse(functionRegistry.lookupFunction(qualifiedName.unquotedString))
+      .getOrElse {
+        if (name.dataSource.isEmpty) {
+          currentSessionCatalog.lookupFunctionInfo(name)
+        } else {
+          getDataSourceSessionCatalog(name.dataSource.get).lookupFunctionInfo(name)
+        }
+      }
   }
 
   /**
@@ -871,7 +899,12 @@ class SessionCatalog(
    * defined).
    */
   def listFunctions(db: String, pattern: String): Seq[(FunctionIdentifier, String)] = {
-    currentSessionCatalog.listFunctions(db, pattern)
+    val loadedFunctions = StringUtils.filterPattern(functionRegistry.listFunction(), pattern)
+      .map { f => FunctionIdentifier(f) }
+    currentSessionCatalog.listFunctions(db, pattern) ++ loadedFunctions.map {
+      case f if FunctionRegistry.functionSet.contains(f.funcName) => (f, "SYSTEM")
+      case f => (f, "USER")
+    }
   }
 
 

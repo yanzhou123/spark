@@ -45,15 +45,13 @@ object DataSourceSessionCatalog {
 class DataSourceSessionCatalog(
                                          val parent: SessionCatalog,
                                          val externalCatalog: ExternalCatalog,
-                                         functionResourceLoader: FunctionResourceLoader,
-                                         functionRegistry: FunctionRegistry,
                                          conf: CatalystConf,
                                          hadoopConf: Configuration)
   extends SessionCatalog(
     parent.sparkSession,
     parent.internalCatalog,
-    functionResourceLoader,
-    functionRegistry,
+    parent.functionResourceLoader,
+    parent.functionRegistry,
     conf,
     hadoopConf) {
 
@@ -66,8 +64,7 @@ class DataSourceSessionCatalog(
           parent: SessionCatalog,
           externalCatalog: ExternalCatalog
           ) {
-    this(parent, externalCatalog, parent.functionResourceLoader,
-      parent.functionRegistry, parent.conf, parent.hadoopConf)
+    this(parent, externalCatalog, parent.conf, parent.hadoopConf)
   }
 
   // Note: we track current database here because certain operations do not explicitly
@@ -630,14 +627,6 @@ class DataSourceSessionCatalog(
     requireDbExists(db)
     val identifier = name.copy(database = Some(db))
     if (functionExists(identifier)) {
-      // TODO: registry should just take in FunctionIdentifier for type safety
-      if (functionRegistry.functionExists(identifier.unquotedString)) {
-        // If we have loaded this function into the FunctionRegistry,
-        // also drop it from there.
-        // For a permanent function, because we loaded it to the FunctionRegistry
-        // when it's first used, we also need to drop it from the FunctionRegistry.
-        functionRegistry.dropFunction(identifier.unquotedString)
-      }
       externalCatalog.dropFunction(db, name.funcName)
     } else if (!ignoreIfNotExists) {
       throw new NoSuchFunctionException(datasource =
@@ -663,8 +652,7 @@ class DataSourceSessionCatalog(
   override def functionExists(name: FunctionIdentifier): Boolean = {
     val db = formatDatabaseName(name.database.getOrElse(getCurrentDatabase))
     requireDbExists(db)
-    functionRegistry.functionExists(name.unquotedString) ||
-      externalCatalog.functionExists(db, name.funcName)
+    externalCatalog.functionExists(db, name.funcName)
   }
 
   // ----------------------------------------------------------------
@@ -682,14 +670,6 @@ class DataSourceSessionCatalog(
     throw new UnsupportedOperationException("Use sqlContext.udf.register(...) instead.")
   }
 
-  /**
-   * Loads resources such as JARs and Files for a function. Every resource is represented
-   * by a tuple (resource type, resource uri).
-   */
-  override def loadFunctionResources(resources: Seq[FunctionResource]): Unit = {
-    resources.foreach(functionResourceLoader.loadResource)
-  }
-
   override protected def failFunctionLookup(name: String): Nothing = {
     throw new NoSuchFunctionException(datasource = externalCatalog.name,
       db = currentDb, func = name)
@@ -703,18 +683,14 @@ class DataSourceSessionCatalog(
     // TODO: just make function registry take in FunctionIdentifier instead of duplicating this
     val database = name.database.orElse(Some(currentDb)).map(formatDatabaseName)
     val qualifiedName = name.copy(database = database)
-    functionRegistry.lookupFunction(name.funcName)
-      .orElse(functionRegistry.lookupFunction(qualifiedName.unquotedString))
-      .getOrElse {
-        val db = qualifiedName.database.get
-        requireDbExists(db)
-        if (externalCatalog.functionExists(db, name.funcName)) {
-          val metadata = externalCatalog.getFunction(db, name.funcName)
-          new ExpressionInfo(metadata.className, qualifiedName.unquotedString)
-        } else {
-          failFunctionLookup(name.funcName)
-        }
-      }
+    val db = qualifiedName.database.get
+    requireDbExists(db)
+    if (externalCatalog.functionExists(db, name.funcName)) {
+      val metadata = externalCatalog.getFunction(db, name.funcName)
+      new ExpressionInfo(metadata.className, qualifiedName.unquotedString)
+    } else {
+      failFunctionLookup(name.funcName)
+    }
   }
 
   /**
@@ -736,14 +712,16 @@ class DataSourceSessionCatalog(
     // Note: the implementation of this function is a little bit convoluted.
     // We probably shouldn't use a single FunctionRegistry to register all three kinds of functions
     // (built-in, temp, and external).
-    if (name.database.isEmpty && functionRegistry.functionExists(name.funcName)) {
+    if (name.dataSource.isEmpty && name.database.isEmpty &&
+      functionRegistry.functionExists(name.funcName)) {
       // This function has been already loaded into the function registry.
       return functionRegistry.lookupFunction(name.funcName, children)
     }
 
     // If the name itself is not qualified, add the current database to it.
+    val datasource = Some(externalCatalog.name)
     val database = name.database.orElse(Some(currentDb)).map(formatDatabaseName)
-    val qualifiedName = name.copy(database = database)
+    val qualifiedName = name.copy(database = database, dataSource = datasource)
 
     if (functionRegistry.functionExists(qualifiedName.unquotedString)) {
       // This function has been already loaded into the function registry.
@@ -756,7 +734,7 @@ class DataSourceSessionCatalog(
     // in the metastore). We need to first put the function in the FunctionRegistry.
     // TODO: why not just check whether the function exists first?
     val catalogFunction = try {
-      externalCatalog.getFunction(currentDb, name.funcName)
+      externalCatalog.getFunction(qualifiedName.database.get, name.funcName)
     } catch {
       case e: AnalysisException => failFunctionLookup(name.funcName)
       case e: NoSuchPermanentFunctionException => failFunctionLookup(name.funcName)
@@ -775,28 +753,6 @@ class DataSourceSessionCatalog(
   }
 
   /**
-   * Create a temporary function.
-   * This assumes no database is specified in `funcDefinition`.
-   */
-  override def createTempFunction(
-                          name: String,
-                          info: ExpressionInfo,
-                          funcDefinition: FunctionBuilder,
-                          ignoreIfExists: Boolean): Unit = {
-    if (functionRegistry.lookupFunctionBuilder(name).isDefined && !ignoreIfExists) {
-      throw new TempFunctionAlreadyExistsException(name)
-    }
-    functionRegistry.registerFunction(name, info, funcDefinition)
-  }
-
-  /**
-   * List all functions in the specified database, including temporary functions. This
-   * returns the function identifier and the scope in which it was defined (system or user
-   * defined).
-   */
-  override def listFunctions(db: String): Seq[(FunctionIdentifier, String)] = listFunctions(db, "*")
-
-  /**
    * List all matching functions in the specified database, including temporary functions. This
    * returns the function identifier and the scope in which it was defined (system or user
    * defined).
@@ -806,10 +762,7 @@ class DataSourceSessionCatalog(
     requireDbExists(dbName)
     val dbFunctions = externalCatalog.listFunctions(dbName, pattern)
       .map { f => FunctionIdentifier(f, Some(dbName)) }
-    val loadedFunctions = StringUtils.filterPattern(functionRegistry.listFunction(), pattern)
-      .map { f => FunctionIdentifier(f) }
-    val functions = dbFunctions ++ loadedFunctions
-    functions.map {
+    dbFunctions.map {
       case f if FunctionRegistry.functionSet.contains(f.funcName) => (f, "SYSTEM")
       case f => (f, "USER")
     }

@@ -110,8 +110,6 @@ class InMemoryCatalog(hadoopConfig: Configuration = new Configuration) extends E
 
   override def getSessionCatalog(sessionCatalog: SessionCatalog): DataSourceSessionCatalog =
     new DataSourceSessionCatalog(sessionCatalog, this,
-      sessionCatalog.functionResourceLoader,
-      sessionCatalog.functionRegistry,
       sessionCatalog.conf, sessionCatalog.hadoopConf)
 
   // --------------------------------------------------------------------------
