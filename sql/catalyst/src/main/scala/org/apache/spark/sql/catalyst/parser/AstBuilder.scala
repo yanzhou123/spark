@@ -741,11 +741,13 @@ class AstBuilder extends SqlBaseBaseVisitor[AnyRef] with Logging {
    * Table Identifier parsing
    * ******************************************************************************************** */
   /**
-   * Create a [[TableIdentifier]] from a 'tableName' or 'databaseName'.'tableName' pattern.
+   * Create a [[TableIdentifier]] from a 'tableName', 'databaseName'.'tableName'
+   * or 'datasourceName'.'databaseName'.'tableName' pattern.
    */
   override def visitTableIdentifier(
       ctx: TableIdentifierContext): TableIdentifier = withOrigin(ctx) {
-    TableIdentifier(ctx.table.getText, Option(ctx.db).map(_.getText))
+    TableIdentifier(ctx.table.getText, Option(ctx.db).map(_.getText),
+      Option(ctx.datasource).map(_.getText))
   }
 
   /* ********************************************************************************************

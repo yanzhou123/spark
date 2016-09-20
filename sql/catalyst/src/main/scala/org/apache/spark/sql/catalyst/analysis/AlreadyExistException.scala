@@ -47,3 +47,9 @@ class FunctionAlreadyExistsException(db: String, func: String)
 
 class TempFunctionAlreadyExistsException(func: String)
   extends AnalysisException(s"Temporary function '$func' already exists")
+
+class DataSourceAlreadyExistsException(dataSource: String)
+  extends AnalysisException(s"Data Source '$dataSource' already exists")
+
+class DataSourceSessionAlreadyExistsException(dataSource: String)
+  extends AnalysisException(s"Data Source '$dataSource' already registered for this session")

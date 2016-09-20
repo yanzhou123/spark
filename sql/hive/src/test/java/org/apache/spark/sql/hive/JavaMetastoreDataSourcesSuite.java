@@ -71,7 +71,8 @@ public class JavaMetastoreDataSourcesSuite {
     if (path.exists()) {
       path.delete();
     }
-    HiveSessionCatalog catalog = (HiveSessionCatalog) sqlContext.sessionState().catalog();
+    HiveSessionCatalog catalog = (HiveSessionCatalog) sqlContext.sessionState()
+            .catalog().getCurrentDataSourceSessionCatalog();
     hiveManagedPath = new Path(
       catalog.hiveDefaultTableFilePath(new TableIdentifier("javaSavedTable")));
     fs = hiveManagedPath.getFileSystem(sc.hadoopConfiguration());

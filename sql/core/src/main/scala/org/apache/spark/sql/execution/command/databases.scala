@@ -53,7 +53,8 @@ case class ShowDatabasesCommand(databasePattern: Option[String]) extends Runnabl
  *   USE database_name;
  * }}}
  */
-case class SetDatabaseCommand(databaseName: String) extends RunnableCommand {
+case class SetDatabaseCommand(databaseName: String, dataSource: Option[String] = None)
+  extends RunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     sparkSession.sessionState.catalog.setCurrentDatabase(databaseName)

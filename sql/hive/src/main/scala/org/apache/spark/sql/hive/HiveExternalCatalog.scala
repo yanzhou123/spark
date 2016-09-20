@@ -26,9 +26,9 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hive.ql.metadata.HiveException
 import org.apache.thrift.TException
 
-import org.apache.spark.SparkConf
+import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.AnalysisException
+import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException
 import org.apache.spark.sql.catalyst.catalog._
@@ -44,17 +44,30 @@ import org.apache.spark.sql.types.{DataType, StructType}
  * A persistent implementation of the system catalog using Hive.
  * All public methods must be synchronized for thread-safety.
  */
-private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configuration)
+private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
   extends ExternalCatalog with Logging {
+
+  // For testing purpose only
+  def this(conf: SparkConf, hadoopConf: Configuration) = {
+    this(null)
+    testConf = Some(conf)
+    testHadoopConf = Some(hadoopConf)
+  }
 
   import CatalogTypes.TablePartitionSpec
   import HiveExternalCatalog._
   import CatalogTableType._
 
+  override val name = "hive"
+
+  private var testConf: Option[SparkConf] = None
+  private var testHadoopConf: Option[Configuration] = None
+  lazy val conf = testConf.getOrElse(sparkContext.conf)
+  lazy val hadoopConf = testHadoopConf.getOrElse(sparkContext.hadoopConfiguration)
   /**
    * A Hive client used to interact with the metastore.
    */
-  val client: HiveClient = {
+  lazy val client: HiveClient = {
     HiveUtils.newClientForMetadata(conf, hadoopConf)
   }
 
@@ -62,6 +75,14 @@ private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configurat
   private val clientExceptions = Set(
     classOf[HiveException].getCanonicalName,
     classOf[TException].getCanonicalName)
+
+  def sessionClient: HiveClient = client.newSession()
+
+  override def getSessionCatalog(sessionCatalog: SessionCatalog): DataSourceSessionCatalog = {
+    val session = sessionCatalog.sparkSession.asInstanceOf[SparkSession]
+    new HiveSessionCatalog(this, sessionClient, session,
+      session.sessionState.conf, sessionCatalog.hadoopConf)
+  }
 
   /**
    * Whether this is an exception thrown by the hive client that should be wrapped.

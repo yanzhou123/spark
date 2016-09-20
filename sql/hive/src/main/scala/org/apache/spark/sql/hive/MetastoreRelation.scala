@@ -225,7 +225,7 @@ private[hive] case class MetastoreRelation(
     .filter { c => !catalogTable.partitionColumnNames.contains(c.name) }
     .map(_.toAttribute)
 
-  val output = attributes ++ partitionKeys
+  override val output = attributes ++ partitionKeys
 
   /** An attribute map that can be used to lookup original attributes based on expression id. */
   val attributeMap = AttributeMap(output.map(o => (o, o)))

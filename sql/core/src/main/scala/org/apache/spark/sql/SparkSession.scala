@@ -21,9 +21,7 @@ import java.beans.Introspector
 import java.util.concurrent.atomic.AtomicReference
 
 import scala.collection.JavaConverters._
-import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
-import scala.util.control.NonFatal
 
 import org.apache.spark.{SPARK_VERSION, SparkConf, SparkContext}
 import org.apache.spark.annotation.{DeveloperApi, Experimental}
@@ -34,6 +32,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.scheduler.{SparkListener, SparkListenerApplicationEnd}
 import org.apache.spark.sql.catalog.Catalog
 import org.apache.spark.sql.catalyst._
+import org.apache.spark.sql.catalyst.catalog.SessionCatalog
 import org.apache.spark.sql.catalyst.encoders._
 import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, Range}
@@ -104,11 +103,7 @@ class SparkSession private(
    * functions, and everything else that accepts a [[org.apache.spark.sql.internal.SQLConf]].
    */
   @transient
-  private[sql] lazy val sessionState: SessionState = {
-    SparkSession.reflect[SessionState, SparkSession](
-      SparkSession.sessionStateClassName(sparkContext.conf),
-      self)
-  }
+  private[sql] lazy val sessionState: SessionState = new SessionState(this)
 
   /**
    * A wrapped version of this session in the form of a [[SQLContext]], for backward compatibility.
@@ -666,7 +661,6 @@ class SparkSession private(
       AttributeReference(f.name, f.dataType, f.nullable)()
     }
   }
-
 }
 
 
@@ -910,38 +904,12 @@ object SparkSession {
   /** Reference to the root SparkSession. */
   private val defaultSession = new AtomicReference[SparkSession]
 
-  private val HIVE_SESSION_STATE_CLASS_NAME = "org.apache.spark.sql.hive.HiveSessionState"
-
-  private def sessionStateClassName(conf: SparkConf): String = {
-    conf.get(CATALOG_IMPLEMENTATION) match {
-      case "hive" => HIVE_SESSION_STATE_CLASS_NAME
-      case "in-memory" => classOf[SessionState].getCanonicalName
-    }
-  }
-
-  /**
-   * Helper method to create an instance of [[T]] using a single-arg constructor that
-   * accepts an [[Arg]].
-   */
-  private def reflect[T, Arg <: AnyRef](
-      className: String,
-      ctorArg: Arg)(implicit ctorArgTag: ClassTag[Arg]): T = {
-    try {
-      val clazz = Utils.classForName(className)
-      val ctor = clazz.getDeclaredConstructor(ctorArgTag.runtimeClass)
-      ctor.newInstance(ctorArg).asInstanceOf[T]
-    } catch {
-      case NonFatal(e) =>
-        throw new IllegalArgumentException(s"Error while instantiating '$className':", e)
-    }
-  }
-
   /**
    * Return true if Hive classes can be loaded, otherwise false.
    */
   private[spark] def hiveClassesArePresent: Boolean = {
     try {
-      Utils.classForName(HIVE_SESSION_STATE_CLASS_NAME)
+      Utils.classForName(SessionCatalog.HIVE_EXTERNAL_CATALOG_CLASS_NAME)
       Utils.classForName("org.apache.hadoop.hive.conf.HiveConf")
       true
     } catch {

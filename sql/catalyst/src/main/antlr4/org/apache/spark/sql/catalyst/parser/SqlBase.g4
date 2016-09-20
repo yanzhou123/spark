@@ -62,12 +62,14 @@ singleDataType
 
 statement
     : query                                                            #statementDefault
-    | USE db=identifier                                                #use
-    | CREATE DATABASE (IF NOT EXISTS)? identifier
+    | USE databaseIdentifier                                           #use
+    | CREATE DATABASE (IF NOT EXISTS)? databaseIdentifier
         (COMMENT comment=STRING)? locationSpec?
         (WITH DBPROPERTIES tablePropertyList)?                         #createDatabase
-    | ALTER DATABASE identifier SET DBPROPERTIES tablePropertyList     #setDatabaseProperties
-    | DROP DATABASE (IF EXISTS)? identifier (RESTRICT | CASCADE)?      #dropDatabase
+    | ALTER DATABASE databaseIdentifier
+        SET DBPROPERTIES tablePropertyList                             #setDatabaseProperties
+    | DROP DATABASE (IF EXISTS)? databaseIdentifier
+        (RESTRICT | CASCADE)?                                          #dropDatabase
     | createTableHeader ('(' colTypeList ')')? tableProvider
         (OPTIONS tablePropertyList)?
         (PARTITIONED BY partitionColumnNames=identifierList)?
@@ -135,7 +137,7 @@ statement
         (LIKE? (qualifiedName | pattern=STRING))?                      #showFunctions
     | SHOW CREATE TABLE tableIdentifier                                #showCreateTable
     | (DESC | DESCRIBE) FUNCTION EXTENDED? describeFuncName            #describeFunction
-    | (DESC | DESCRIBE) DATABASE EXTENDED? identifier                  #describeDatabase
+    | (DESC | DESCRIBE) DATABASE EXTENDED? databaseIdentifier          #describeDatabase
     | (DESC | DESCRIBE) option=(EXTENDED | FORMATTED)?
         tableIdentifier partitionSpec? describeColName?                #describeTable
     | REFRESH TABLE tableIdentifier                                    #refreshTable
@@ -477,7 +479,12 @@ rowFormat
     ;
 
 tableIdentifier
-    : (db=identifier '.')? table=identifier
+    : ((datasource=identifier '.')? db=identifier '.')? table=identifier
+    | datasource=identifier '.' '.' table=identifier
+    ;
+
+databaseIdentifier
+    : (datasource=identifier '.')? db=identifier
     ;
 
 namedExpression

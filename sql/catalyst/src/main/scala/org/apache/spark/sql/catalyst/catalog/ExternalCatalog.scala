@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.catalyst.catalog
 
+import scala.collection.mutable
+
 import org.apache.spark.sql.catalyst.analysis.{FunctionAlreadyExistsException, NoSuchDatabaseException, NoSuchFunctionException}
 
 
@@ -32,15 +34,26 @@ import org.apache.spark.sql.catalyst.analysis.{FunctionAlreadyExistsException, N
 abstract class ExternalCatalog {
   import CatalogTypes.TablePartitionSpec
 
+  val name: String
+
+  val properties = new mutable.HashMap[String, String]
+
   protected def requireDbExists(db: String): Unit = {
     if (!databaseExists(db)) {
       throw new NoSuchDatabaseException(db)
     }
   }
 
+  /**
+   * @param sessionCatalog SessionCatalog
+   * @return SessionState
+   */
+
+  def getSessionCatalog(sessionCatalog: SessionCatalog): DataSourceSessionCatalog
+
   protected def requireFunctionExists(db: String, funcName: String): Unit = {
     if (!functionExists(db, funcName)) {
-      throw new NoSuchFunctionException(db = db, func = funcName)
+      throw new NoSuchFunctionException(name, db = db, func = funcName)
     }
   }
 
@@ -212,4 +225,8 @@ abstract class ExternalCatalog {
 
   def listFunctions(db: String, pattern: String): Seq[String]
 
+  def setProperties(properties: Map[String, String]): ExternalCatalog = {
+    properties.foreach(p => this.properties.put(p._1, p._2))
+    this
+  }
 }

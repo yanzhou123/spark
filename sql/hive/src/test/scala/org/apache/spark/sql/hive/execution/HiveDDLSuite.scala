@@ -30,6 +30,7 @@ import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.execution.command.DDLUtils
 import org.apache.spark.sql.execution.datasources.CaseInsensitiveMap
 import org.apache.spark.sql.hive.HiveExternalCatalog
+import org.apache.spark.sql.hive.HiveSessionCatalog
 import org.apache.spark.sql.hive.test.TestHiveSingleton
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SQLTestUtils
@@ -52,7 +53,8 @@ class HiveDDLSuite
       dbPath: Option[String] = None): Boolean = {
     val expectedTablePath =
       if (dbPath.isEmpty) {
-        hiveContext.sessionState.catalog.hiveDefaultTableFilePath(tableIdentifier)
+        hiveContext.sessionState.catalog.getCurrentDataSourceSessionCatalog
+          .asInstanceOf[HiveSessionCatalog].hiveDefaultTableFilePath(tableIdentifier)
       } else {
         new Path(new Path(dbPath.get), tableIdentifier.table).toString
       }

@@ -25,15 +25,18 @@ import org.apache.hadoop.hive.ql.exec.{UDAF, UDF}
 import org.apache.hadoop.hive.ql.exec.{FunctionRegistry => HiveFunctionRegistry}
 import org.apache.hadoop.hive.ql.udf.generic.{AbstractGenericUDAFResolver, GenericUDF, GenericUDTF}
 
-import org.apache.spark.sql.{AnalysisException, SparkSession}
+import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
-import org.apache.spark.sql.catalyst.analysis.FunctionRegistry
+import org.apache.spark.sql.catalyst.analysis.Analyzer
 import org.apache.spark.sql.catalyst.analysis.FunctionRegistry.FunctionBuilder
-import org.apache.spark.sql.catalyst.catalog.{FunctionResourceLoader, SessionCatalog}
+import org.apache.spark.sql.catalyst.catalog.DataSourceSessionCatalog
 import org.apache.spark.sql.catalyst.expressions.{Cast, Expression, ExpressionInfo}
+import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias}
 import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.execution.{SparkOptimizer, SparkPlanner}
 import org.apache.spark.sql.hive.HiveShim.HiveFunctionWrapper
+import org.apache.spark.sql.hive.client.HiveClient
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DecimalType, DoubleType}
 import org.apache.spark.util.Utils
@@ -41,31 +44,23 @@ import org.apache.spark.util.Utils
 
 private[sql] class HiveSessionCatalog(
     externalCatalog: HiveExternalCatalog,
+    private[hive] val client: HiveClient,
     sparkSession: SparkSession,
-    functionResourceLoader: FunctionResourceLoader,
-    functionRegistry: FunctionRegistry,
     conf: SQLConf,
     hadoopConf: Configuration)
-  extends SessionCatalog(
+  extends DataSourceSessionCatalog(
+    sparkSession.sessionState.catalog,
     externalCatalog,
-    functionResourceLoader,
-    functionRegistry,
     conf,
     hadoopConf) {
 
+  self =>
+
   override def lookupRelation(name: TableIdentifier, alias: Option[String]): LogicalPlan = {
     val table = formatTableName(name.table)
-    if (name.database.isDefined || !tempTables.contains(table)) {
-      val database = name.database.map(formatDatabaseName)
-      val newName = name.copy(database = database, table = table)
-      metastoreCatalog.lookupRelation(newName, alias)
-    } else {
-      val relation = tempTables(table)
-      val tableWithQualifiers = SubqueryAlias(table, relation, None)
-      // If an alias was specified by the lookup, wrap the plan in a subquery so that
-      // attributes are properly qualified with this alias.
-      alias.map(a => SubqueryAlias(a, tableWithQualifiers, None)).getOrElse(tableWithQualifiers)
-    }
+    val database = name.database.map(formatDatabaseName)
+    val newName = name.copy(database = database, table = table, dataSource = name.dataSource)
+    metastoreCatalog.lookupRelation(newName, alias)
   }
 
   // ----------------------------------------------------------------
@@ -76,7 +71,7 @@ private[sql] class HiveSessionCatalog(
   // essentially a cache for metastore tables. However, it relies on a lot of session-specific
   // things so it would be a lot of work to split its functionality between HiveSessionCatalog
   // and HiveCatalog. We should still do it at some point...
-  private val metastoreCatalog = new HiveMetastoreCatalog(sparkSession)
+  private val metastoreCatalog = new HiveMetastoreCatalog(sparkSession, this)
 
   val ParquetConversions: Rule[LogicalPlan] = metastoreCatalog.ParquetConversions
   val OrcConversions: Rule[LogicalPlan] = metastoreCatalog.OrcConversions
@@ -229,4 +224,65 @@ private[sql] class HiveSessionCatalog(
     "histogram_numeric",
     "percentile"
   )
+
+  // When true, enables an experimental feature where metastore tables that use the parquet SerDe
+  // are automatically converted to use the Spark SQL parquet table scan, instead of the HiveSerDe.
+  def convertMetastoreParquet: Boolean = {
+    conf.getConf(HiveUtils.CONVERT_METASTORE_PARQUET)
+  }
+
+  // When true, also tries to merge possibly different but compatible Parquet schemas in different
+  // Parquet data files.
+  //
+  // This configuration is only effective when "spark.sql.hive.convertMetastoreParquet" is true.
+  def convertMetastoreParquetWithSchemaMerging: Boolean = {
+    conf.getConf(HiveUtils.CONVERT_METASTORE_PARQUET_WITH_SCHEMA_MERGING)
+  }
+
+  // When true, enables an experimental feature where metastore tables that use the Orc SerDe
+  // are automatically converted to use the Spark SQL ORC table scan, instead of the Hive
+  // SerDe.
+  def convertMetastoreOrc: Boolean = {
+    conf.getConf(HiveUtils.CONVERT_METASTORE_ORC)
+  }
+
+  // When true, Hive Thrift server will execute SQL queries asynchronously using a thread pool."
+  def hiveThriftServerAsync: Boolean = {
+    conf.getConf(HiveUtils.HIVE_THRIFT_SERVER_ASYNC)
+  }
+
+  // TODO: why do we get this from SparkConf but not SQLConf?
+  def hiveThriftServerSingleSession: Boolean = {
+    sparkSession.sparkContext.conf.getBoolean(
+      "spark.sql.hive.thriftServer.singleSession", defaultValue = false)
+  }
+
+  override def addJar(path: String): Unit = {
+    client.addJar(path)
+    super.addJar(path)
+  }
+
+  override lazy val analyzer: Analyzer = {
+    new Analyzer(this, conf) {
+      override val extendedResolutionRules =
+        ParquetConversions :: OrcConversions :: Nil
+    }
+  }
+
+  override lazy val optimizer: Optimizer = new SparkOptimizer(this,
+    conf, new ExperimentalMethods) {
+    override def batches: Seq[Batch] = Nil
+  }
+
+  override def planner: SparkPlanner =
+    new SparkPlanner(sparkSession.sparkContext, conf, Nil) with HiveStrategies {
+      override val sparkSession: SparkSession = self.sparkSession
+      override def strategies: Seq[Strategy] = {
+        Seq(
+          HiveTableScans,
+          DataSinks,
+          Scripts
+        )
+      }
+  }
 }

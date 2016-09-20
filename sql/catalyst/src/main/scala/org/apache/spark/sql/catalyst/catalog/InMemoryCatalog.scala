@@ -46,6 +46,8 @@ class InMemoryCatalog(
 
   import CatalogTypes.TablePartitionSpec
 
+  override val name = SessionCatalog.DEFAULT_DATASOURCE
+
   private class TableDesc(var table: CatalogTable) {
     val partitions = new mutable.HashMap[TablePartitionSpec, CatalogTablePartition]
   }
@@ -96,6 +98,10 @@ class InMemoryCatalog(
       }
     }
   }
+
+  override def getSessionCatalog(sessionCatalog: SessionCatalog): DataSourceSessionCatalog =
+    new DataSourceSessionCatalog(sessionCatalog, this,
+      sessionCatalog.conf, sessionCatalog.hadoopConf)
 
   // --------------------------------------------------------------------------
   // Databases

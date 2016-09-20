@@ -54,6 +54,7 @@ abstract class Optimizer(sessionCatalog: SessionCatalog, conf: CatalystConf)
       ReplaceExpressions,
       ComputeCurrentTime,
       GetCurrentDatabase(sessionCatalog),
+      GetCurrentDataSource(sessionCatalog),
       RewriteDistinctAggregates) ::
     //////////////////////////////////////////////////////////////////////////////////////////
     // Optimizer rules start here
@@ -1108,6 +1109,16 @@ object RemoveLiteralFromGroupExpressions extends Rule[LogicalPlan] {
         // instead replace this by single, easy to hash/sort, literal expression.
         a.copy(groupingExpressions = Seq(Literal(0, IntegerType)))
       }
+  }
+}
+
+/** Replaces the expression of CurrentDatabase with the current database name. */
+case class GetCurrentDataSource(sessionCatalog: SessionCatalog) extends Rule[LogicalPlan] {
+  def apply(plan: LogicalPlan): LogicalPlan = {
+    plan transformAllExpressions {
+      case CurrentDataSource() =>
+        Literal.create(sessionCatalog.getCurrentDataSource, StringType)
+    }
   }
 }
 

@@ -50,8 +50,9 @@ case class InsertIntoHiveTable(
     overwrite: Boolean,
     ifNotExists: Boolean) extends UnaryExecNode {
 
-  @transient private val sessionState = sqlContext.sessionState.asInstanceOf[HiveSessionState]
-  @transient private val externalCatalog = sqlContext.sharedState.externalCatalog
+  @transient private val sessionState = sqlContext.sessionState
+  @transient private val externalCatalog = sessionState.catalog
+    .getDataSourceSessionCatalog(table.catalogTable.identifier.dataSource.get).externalCatalog
 
   def output: Seq[Attribute] = Seq.empty
 

@@ -20,13 +20,11 @@ package org.apache.spark.sql.internal
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
-import org.apache.hadoop.conf.Configuration
-
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.config._
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SQLContext}
-import org.apache.spark.sql.catalyst.catalog.{ExternalCatalog, InMemoryCatalog}
+import org.apache.spark.sql.catalyst.catalog.{ExternalCatalog, InMemoryCatalog, InternalCatalog, SessionCatalog}
 import org.apache.spark.sql.execution.CacheManager
 import org.apache.spark.sql.execution.ui.{SQLListener, SQLTab}
 import org.apache.spark.util.{MutableURLClassLoader, Utils}
@@ -56,12 +54,18 @@ private[sql] class SharedState(val sparkContext: SparkContext) extends Logging {
 
   /**
    * A catalog that interacts with external systems.
+   * Default ExternalCatalog: for backward compatibility purpose.
    */
-  lazy val externalCatalog: ExternalCatalog =
-    SharedState.reflect[ExternalCatalog, SparkConf, Configuration](
-      SharedState.externalCatalogClassName(sparkContext.conf),
-      sparkContext.conf,
-      sparkContext.hadoopConfiguration)
+  val externalCatalog: ExternalCatalog = sparkContext.conf.get(CATALOG_IMPLEMENTATION.key,
+      SessionCatalog.DEFAULT_DATASOURCE) match {
+    case SessionCatalog.DEFAULT_DATASOURCE =>
+      new InMemoryCatalogReal(sparkContext.hadoopConfiguration)
+    case "hive" => InternalCatalog
+      .reflect[ExternalCatalog, SparkContext](SessionCatalog.HIVE_EXTERNAL_CATALOG_CLASS_NAME,
+      sparkContext)
+  }
+
+  lazy val internalCatalog: InternalCatalog = new InternalCatalog(externalCatalog)
 
   /**
    * A classloader used to load all user-added jar.

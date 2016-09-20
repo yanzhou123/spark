@@ -453,7 +453,8 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
   test("Caching converted data source Parquet Relations") {
     def checkCached(tableIdentifier: TableIdentifier): Unit = {
       // Converted test_parquet should be cached.
-      sessionState.catalog.getCachedDataSourceTable(tableIdentifier) match {
+      sessionState.catalog.getCurrentDataSourceSessionCatalog
+        .asInstanceOf[HiveSessionCatalog].getCachedDataSourceTable(tableIdentifier) match {
         case null => fail("Converted test_parquet should be cached in the cache.")
         case logical @ LogicalRelation(parquetRelation: HadoopFsRelation, _, _) => // OK
         case other =>
@@ -479,16 +480,18 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
       """.stripMargin)
 
     var tableIdentifier = TableIdentifier("test_insert_parquet", Some("default"))
+    val hiveSessionCatalog = sessionState.catalog.getCurrentDataSourceSessionCatalog
+      .asInstanceOf[HiveSessionCatalog]
 
     // First, make sure the converted test_parquet is not cached.
-    assert(sessionState.catalog.getCachedDataSourceTable(tableIdentifier) === null)
+    assert(hiveSessionCatalog.getCachedDataSourceTable(tableIdentifier) === null)
     // Table lookup will make the table cached.
     table("test_insert_parquet")
     checkCached(tableIdentifier)
     // For insert into non-partitioned table, we will do the conversion,
     // so the converted test_insert_parquet should be cached.
     sessionState.refreshTable("test_insert_parquet")
-    assert(sessionState.catalog.getCachedDataSourceTable(tableIdentifier) === null)
+    assert(hiveSessionCatalog.getCachedDataSourceTable(tableIdentifier) === null)
     sql(
       """
         |INSERT INTO TABLE test_insert_parquet
@@ -501,7 +504,7 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
       sql("select a, b from jt").collect())
     // Invalidate the cache.
     sessionState.refreshTable("test_insert_parquet")
-    assert(sessionState.catalog.getCachedDataSourceTable(tableIdentifier) === null)
+    assert(hiveSessionCatalog.getCachedDataSourceTable(tableIdentifier) === null)
 
     // Create a partitioned table.
     sql(
@@ -519,7 +522,7 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
       """.stripMargin)
 
     tableIdentifier = TableIdentifier("test_parquet_partitioned_cache_test", Some("default"))
-    assert(sessionState.catalog.getCachedDataSourceTable(tableIdentifier) === null)
+    assert(hiveSessionCatalog.getCachedDataSourceTable(tableIdentifier) === null)
     sql(
       """
         |INSERT INTO TABLE test_parquet_partitioned_cache_test
@@ -528,14 +531,14 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
       """.stripMargin)
     // Right now, insert into a partitioned Parquet is not supported in data source Parquet.
     // So, we expect it is not cached.
-    assert(sessionState.catalog.getCachedDataSourceTable(tableIdentifier) === null)
+    assert(hiveSessionCatalog.getCachedDataSourceTable(tableIdentifier) === null)
     sql(
       """
         |INSERT INTO TABLE test_parquet_partitioned_cache_test
         |PARTITION (`date`='2015-04-02')
         |select a, b from jt
       """.stripMargin)
-    assert(sessionState.catalog.getCachedDataSourceTable(tableIdentifier) === null)
+    assert(hiveSessionCatalog.getCachedDataSourceTable(tableIdentifier) === null)
 
     // Make sure we can cache the partitioned table.
     table("test_parquet_partitioned_cache_test")
@@ -551,7 +554,7 @@ class ParquetMetastoreSuite extends ParquetPartitioningTest {
         """.stripMargin).collect())
 
     sessionState.refreshTable("test_parquet_partitioned_cache_test")
-    assert(sessionState.catalog.getCachedDataSourceTable(tableIdentifier) === null)
+    assert(hiveSessionCatalog.getCachedDataSourceTable(tableIdentifier) === null)
 
     dropTables("test_insert_parquet", "test_parquet_partitioned_cache_test")
   }

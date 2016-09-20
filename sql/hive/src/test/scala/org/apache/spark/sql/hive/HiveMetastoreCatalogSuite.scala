@@ -64,7 +64,8 @@ class HiveMetastoreCatalogSuite extends TestHiveSingleton with SQLTestUtils {
       spark.sql("create view vw1 as select 1 as id")
       val plan = spark.sql("select id from vw1").queryExecution.analyzed
       val aliases = plan.collect {
-        case x @ SubqueryAlias("vw1", _, Some(TableIdentifier("vw1", Some("default")))) => x
+        case x @ SubqueryAlias("vw1", _,
+        Some(TableIdentifier("vw1", Some("default"), Some("hive")))) => x
       }
       assert(aliases.size == 1)
     }
@@ -117,7 +118,9 @@ class DataSourceWithHiveMetastoreCatalogSuite
         assert(columns.map(_.dataType) === Seq(DecimalType(10, 3), StringType))
 
         checkAnswer(table("t"), testDF)
-        assert(sessionState.metadataHive.runSqlHive("SELECT * FROM t") === Seq("1.1\t1", "2.1\t2"))
+        assert(sessionState.catalog.getCurrentDataSourceSessionCatalog
+          .asInstanceOf[HiveSessionCatalog].client
+          .runSqlHive("SELECT * FROM t") === Seq("1.1\t1", "2.1\t2"))
       }
     }
 
@@ -150,7 +153,9 @@ class DataSourceWithHiveMetastoreCatalogSuite
           assert(columns.map(_.dataType) === Seq(DecimalType(10, 3), StringType))
 
           checkAnswer(table("t"), testDF)
-          assert(sessionState.metadataHive.runSqlHive("SELECT * FROM t") ===
+          assert(sessionState.catalog.getCurrentDataSourceSessionCatalog
+            .asInstanceOf[HiveSessionCatalog].client
+            .runSqlHive("SELECT * FROM t") ===
             Seq("1.1\t1", "2.1\t2"))
         }
       }
@@ -181,7 +186,9 @@ class DataSourceWithHiveMetastoreCatalogSuite
           assert(columns.map(_.dataType) === Seq(IntegerType, StringType))
 
           checkAnswer(table("t"), Row(1, "val_1"))
-          assert(sessionState.metadataHive.runSqlHive("SELECT * FROM t") === Seq("1\tval_1"))
+          assert(sessionState.catalog.getCurrentDataSourceSessionCatalog
+            .asInstanceOf[HiveSessionCatalog].client
+            .runSqlHive("SELECT * FROM t") === Seq("1\tval_1"))
         }
       }
     }

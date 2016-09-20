@@ -24,7 +24,7 @@ import scala.collection.JavaConverters._
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SQLContext}
-import org.apache.spark.sql.hive.{HiveSessionState, HiveUtils}
+import org.apache.spark.sql.hive.{HiveSessionCatalog, HiveUtils}
 import org.apache.spark.util.Utils
 
 /** A singleton object for the master program. The slaves should not access this. */
@@ -58,10 +58,11 @@ private[hive] object SparkSQLEnv extends Logging {
       sparkContext = sparkSession.sparkContext
       sqlContext = sparkSession.sqlContext
 
-      val sessionState = sparkSession.sessionState.asInstanceOf[HiveSessionState]
-      sessionState.metadataHive.setOut(new PrintStream(System.out, true, "UTF-8"))
-      sessionState.metadataHive.setInfo(new PrintStream(System.err, true, "UTF-8"))
-      sessionState.metadataHive.setError(new PrintStream(System.err, true, "UTF-8"))
+      val sessionCatalog = sparkSession.sessionState.catalog.getDataSourceSessionCatalog("hive")
+        .asInstanceOf[HiveSessionCatalog]
+      sessionCatalog.client.setOut(new PrintStream(System.out, true, "UTF-8"))
+      sessionCatalog.client.setInfo(new PrintStream(System.err, true, "UTF-8"))
+      sessionCatalog.client.setError(new PrintStream(System.err, true, "UTF-8"))
       sparkSession.conf.set("spark.sql.hive.version", HiveUtils.hiveExecutionVersion)
     }
   }

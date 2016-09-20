@@ -42,15 +42,15 @@ import org.apache.spark.sql.types._
  * This is still used for things like creating data source tables, but in the future will be
  * cleaned up to integrate more nicely with [[HiveExternalCatalog]].
  */
-private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Logging {
-  private val sessionState = sparkSession.sessionState.asInstanceOf[HiveSessionState]
-  private val client =
-    sparkSession.sharedState.externalCatalog.asInstanceOf[HiveExternalCatalog].client
+private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession,
+                                         catalog: HiveSessionCatalog) extends Logging {
+  private val externalCatalog = catalog.externalCatalog
+  private val client = externalCatalog.asInstanceOf[HiveExternalCatalog].client
 
   /** A fully qualified identifier for a table (i.e., database.tableName) */
   case class QualifiedTableName(database: String, name: String)
 
-  private def getCurrentDatabase: String = sessionState.catalog.getCurrentDatabase
+  private def getCurrentDatabase: String = catalog.getCurrentDatabase
 
   def getQualifiedTableName(tableIdent: TableIdentifier): QualifiedTableName = {
     QualifiedTableName(
@@ -69,7 +69,7 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Log
     val cacheLoader = new CacheLoader[QualifiedTableName, LogicalPlan]() {
       override def load(in: QualifiedTableName): LogicalPlan = {
         logDebug(s"Creating new cached data source for $in")
-        val table = sparkSession.sharedState.externalCatalog.getTable(in.database, in.name)
+        val table = externalCatalog.getTable(in.database, in.name)
 
         val dataSource =
           DataSource(
@@ -111,8 +111,28 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Log
       tableIdent: TableIdentifier,
       alias: Option[String]): LogicalPlan = {
     val qualifiedTableName = getQualifiedTableName(tableIdent)
-    val table = sparkSession.sharedState.externalCatalog.getTable(
-      qualifiedTableName.database, qualifiedTableName.name)
+    val nativeTable = externalCatalog.getTable(qualifiedTableName.database, qualifiedTableName.name)
+    // nativeTable directly from external catalog does not have the data source specified
+    // but future use of the CatalogTable may need the info, e.g., in InsertIntoHiveTable
+    val table = CatalogTable(
+      TableIdentifier(nativeTable.identifier.table,
+        nativeTable.identifier.database, Some(externalCatalog.name)),
+      nativeTable.tableType,
+      nativeTable.storage,
+      nativeTable.schema,
+      nativeTable.provider,
+      nativeTable.partitionColumnNames,
+      nativeTable.bucketSpec,
+      nativeTable.owner,
+      nativeTable.createTime,
+      nativeTable.lastAccessTime,
+      nativeTable.properties,
+      nativeTable.stats,
+      nativeTable.viewOriginalText,
+      nativeTable.viewText,
+      nativeTable.comment,
+      nativeTable.unsupportedFeatures
+      )
 
     if (DDLUtils.isDatasourceTable(table)) {
       val dataSourceTable = cachedDataSourceTables(qualifiedTableName)
@@ -301,14 +321,14 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Log
   object ParquetConversions extends Rule[LogicalPlan] {
     private def shouldConvertMetastoreParquet(relation: MetastoreRelation): Boolean = {
       relation.tableDesc.getSerdeClassName.toLowerCase.contains("parquet") &&
-        sessionState.convertMetastoreParquet
+        catalog.convertMetastoreParquet
     }
 
     private def convertToParquetRelation(relation: MetastoreRelation): LogicalRelation = {
       val defaultSource = new ParquetFileFormat()
       val fileFormatClass = classOf[ParquetFileFormat]
 
-      val mergeSchema = sessionState.convertMetastoreParquetWithSchemaMerging
+      val mergeSchema = catalog.convertMetastoreParquetWithSchemaMerging
       val options = Map(ParquetOptions.MERGE_SCHEMA -> mergeSchema.toString)
 
       convertToLogicalRelation(relation, options, defaultSource, fileFormatClass, "parquet")
@@ -341,7 +361,7 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession) extends Log
   object OrcConversions extends Rule[LogicalPlan] {
     private def shouldConvertMetastoreOrc(relation: MetastoreRelation): Boolean = {
       relation.tableDesc.getSerdeClassName.toLowerCase.contains("orc") &&
-        sessionState.convertMetastoreOrc
+        catalog.convertMetastoreOrc
     }
 
     private def convertToOrcRelation(relation: MetastoreRelation): LogicalRelation = {

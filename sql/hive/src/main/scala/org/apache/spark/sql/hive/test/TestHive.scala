@@ -39,7 +39,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.execution.command.CacheTableCommand
 import org.apache.spark.sql.hive._
-import org.apache.spark.sql.internal.{SharedState, SQLConf}
+import org.apache.spark.sql.internal.{SessionState, SharedState, SQLConf}
 import org.apache.spark.util.{ShutdownHookManager, Utils}
 
 // SPARK-3729: Test key required to check for initialization errors with config.
@@ -47,14 +47,15 @@ object TestHive
   extends TestHiveContext(
     new SparkContext(
       System.getProperty("spark.sql.test.master", "local[1]"),
-      "TestSQLContext",
-      new SparkConf()
-        .set("spark.sql.test", "")
-        .set("spark.sql.hive.metastore.barrierPrefixes",
-          "org.apache.spark.sql.hive.execution.PairSerDe")
-        .set("spark.sql.warehouse.dir", TestHiveContext.makeWarehouseDir().toURI.getPath)
-        // SPARK-8910
-        .set("spark.ui.enabled", "false")))
+      "TestSQLContext", {
+        new SparkConf()
+          .set("spark.sql.test", "")
+          .set("spark.sql.hive.metastore.barrierPrefixes",
+            "org.apache.spark.sql.hive.execution.PairSerDe")
+          .set(SQLConf.WAREHOUSE_PATH.key, TestHiveContext.makeWarehouseDir().toURI.getPath)
+          // SPARK-8910
+          .set("spark.ui.enabled", "false")
+      }))
 
 
 /**
@@ -425,9 +426,13 @@ private[hive] class TestHiveSparkSession(
       sharedState.cacheManager.clearCache()
       loadedTables.clear()
       sessionState.catalog.clearTempTables()
-      sessionState.catalog.invalidateCache()
 
-      sessionState.metadataHive.reset()
+      sessionState.catalog.getCurrentDataSourceSessionCatalog
+        .asInstanceOf[HiveSessionCatalog].invalidateCache()
+
+      val client = sessionState.catalog.getCurrentDataSourceSessionCatalog
+        .asInstanceOf[HiveSessionCatalog].client
+      client.reset()
 
       FunctionRegistry.getFunctionNames.asScala.filterNot(originalUDFs.contains(_)).
         foreach { udfName => FunctionRegistry.unregisterTemporaryUDF(udfName) }
@@ -436,14 +441,15 @@ private[hive] class TestHiveSparkSession(
       sessionState.conf.setConfString("fs.default.name", new File(".").toURI.toString)
       // It is important that we RESET first as broken hooks that might have been set could break
       // other sql exec here.
-      sessionState.metadataHive.runSqlHive("RESET")
+
+      client.runSqlHive("RESET")
       // For some reason, RESET does not reset the following variables...
       // https://issues.apache.org/jira/browse/HIVE-9004
-      sessionState.metadataHive.runSqlHive("set hive.table.parameters.default=")
-      sessionState.metadataHive.runSqlHive("set datanucleus.cache.collections=true")
-      sessionState.metadataHive.runSqlHive("set datanucleus.cache.collections.lazy=true")
+      client.runSqlHive("set hive.table.parameters.default=")
+      client.runSqlHive("set datanucleus.cache.collections=true")
+      client.runSqlHive("set datanucleus.cache.collections.lazy=true")
       // Lots of tests fail if we do not change the partition whitelist from the default.
-      sessionState.metadataHive.runSqlHive("set hive.metastore.partition.name.whitelist.pattern=.*")
+      client.runSqlHive("set hive.metastore.partition.name.whitelist.pattern=.*")
 
       sessionState.catalog.setCurrentDatabase("default")
     } catch {
@@ -506,7 +512,7 @@ private[hive] class TestHiveFunctionRegistry extends SimpleFunctionRegistry {
 
 private[hive] class TestHiveSessionState(
     sparkSession: TestHiveSparkSession)
-  extends HiveSessionState(sparkSession) { self =>
+  extends SessionState(sparkSession) { self =>
 
   override lazy val conf: SQLConf = {
     new SQLConf {
