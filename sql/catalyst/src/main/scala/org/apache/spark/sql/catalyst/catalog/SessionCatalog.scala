@@ -84,6 +84,7 @@ class SessionCatalog(
       functionRegistry,
       conf,
       new Configuration())
+    setCurrentDataSource(externalCatalog.name)
   }
 
 
@@ -111,6 +112,7 @@ class SessionCatalog(
       functionRegistry,
       conf,
       new Configuration())
+    setCurrentDataSource(externalCatalog.name)
   }
 
   // For testing only.
@@ -124,6 +126,7 @@ class SessionCatalog(
 
   def this(externalCatalog: ExternalCatalog) {
     this(new InternalCatalog(externalCatalog))
+    setCurrentDataSource(externalCatalog.name)
   }
 
   /** List of temporary tables, mapping from table name to their logical plan. */
@@ -133,6 +136,8 @@ class SessionCatalog(
   private[sql] var _currentDataSource: String = DEFAULT_DATASOURCE
 
   private[sql] def getCurrentDataSourceSessionCatalog = {
+    // _currentSessionCatalog needs to be set separately from _currentDataSource
+    // Otherwise it would lead to infinite recursion during session state construction
     _currentSessionCatalog.getOrElse {
       setCurrentSessionCatalog()
       _currentSessionCatalog.get
@@ -236,8 +241,13 @@ class SessionCatalog(
   def setCurrentDataSource(name: String): Unit = {
     val dataSourceName = formatDataSourceName(name)
     requireDataSourceExists(dataSourceName)
-    synchronized { _currentDataSource = dataSourceName}
-    setCurrentSessionCatalog()
+    synchronized {
+      _currentDataSource = dataSourceName
+      if (_currentSessionCatalog.isEmpty ||
+          _currentSessionCatalog.get.externalCatalog.name != dataSourceName) {
+        _currentSessionCatalog = None
+      }
+    }
   }
 
   /**
@@ -943,10 +953,14 @@ class SessionCatalog(
   }
 
   def getDataSourceSessionCatalog(dataSource: Option[String]): DataSourceSessionCatalog = {
-    dataSource.map(getDataSourceSessionCatalog(_)).getOrElse(_currentSessionCatalog.get)
+    dataSource.map(getDataSourceSessionCatalog(_)).orNull
   }
 
   private[sql] def setCurrentSessionCatalog(): Unit = {
     _currentSessionCatalog = Some(getDataSourceSessionCatalog(_currentDataSource))
+  }
+
+  def externalCatalogExists(catalogName: String): Boolean = {
+    internalCatalog.getSessionCatalogs(sparkSession).exists(_.externalCatalog.name == catalogName)
   }
 }

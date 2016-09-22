@@ -43,7 +43,7 @@ class InMemoryCatalogReal(hadoopConfig: Configuration = new Configuration)
 
       override lazy val analyzer: Analyzer = new Analyzer(this, conf) {
         override val extendedResolutionRules = Nil
-        override val extendedCheckRules = Seq(HiveOnlyCheck)
+        override val extendedCheckRules = Seq(HiveOnlyCheck(sessionCatalog))
       }
 
       override lazy val optimizer: Optimizer = new SparkOptimizer(this,

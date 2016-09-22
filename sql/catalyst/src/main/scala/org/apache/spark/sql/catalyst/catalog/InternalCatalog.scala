@@ -23,7 +23,9 @@ import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
-import org.apache.spark.SparkContext
+import org.apache.hadoop.conf.Configuration
+
+import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.util.Utils
 
@@ -111,7 +113,8 @@ class InternalCatalog extends Serializable {
     var created = false
     externalCatalogMap.getOrElseUpdate(name, {
       created = true
-      InternalCatalog.reflect[ExternalCatalog, SparkContext](provider, sparkContext)
+      InternalCatalog.reflect[ExternalCatalog, SparkConf, Configuration](provider,
+        sparkContext.conf, sparkContext.hadoopConfiguration)
         .setProperties(properties)
     })
     if (!created) {
@@ -151,12 +154,12 @@ class InternalCatalog extends Serializable {
 }
 
 object InternalCatalog {
-  def reflect[T, Arg <: AnyRef](className: String, ctorArg: Arg)
-    (implicit ctorArgTag: ClassTag[Arg]): T = {
+  def reflect[T, Arg1 <: AnyRef, Arg2 <: AnyRef](className: String, ctorArg1: Arg1, ctorArg2: Arg2)
+    (implicit ctorArg1Tag: ClassTag[Arg1], ctorArg2Tag: ClassTag[Arg2]): T = {
     try {
       val clazz = Utils.classForName(className)
-      val ctor = clazz.getDeclaredConstructor(ctorArgTag.runtimeClass)
-      ctor.newInstance(ctorArg).asInstanceOf[T]
+      val ctor = clazz.getDeclaredConstructor(ctorArg1Tag.runtimeClass, ctorArg2Tag.runtimeClass)
+      ctor.newInstance(ctorArg1, ctorArg2).asInstanceOf[T]
     } catch {
       case NonFatal(e) =>
       throw new IllegalArgumentException(s"Error while instantiating '$className':", e)

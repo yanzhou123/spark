@@ -44,15 +44,8 @@ import org.apache.spark.sql.types.{DataType, StructType}
  * A persistent implementation of the system catalog using Hive.
  * All public methods must be synchronized for thread-safety.
  */
-private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
+private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configuration)
   extends ExternalCatalog with Logging {
-
-  // For testing purpose only
-  def this(conf: SparkConf, hadoopConf: Configuration) = {
-    this(null)
-    testConf = Some(conf)
-    testHadoopConf = Some(hadoopConf)
-  }
 
   import CatalogTypes.TablePartitionSpec
   import HiveExternalCatalog._
@@ -60,10 +53,6 @@ private[spark] class HiveExternalCatalog(sparkContext: SparkContext)
 
   override val name = "hive"
 
-  private var testConf: Option[SparkConf] = None
-  private var testHadoopConf: Option[Configuration] = None
-  lazy val conf = testConf.getOrElse(sparkContext.conf)
-  lazy val hadoopConf = testHadoopConf.getOrElse(sparkContext.hadoopConfiguration)
   /**
    * A Hive client used to interact with the metastore.
    */

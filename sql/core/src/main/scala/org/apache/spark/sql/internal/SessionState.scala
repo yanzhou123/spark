@@ -108,10 +108,7 @@ private[sql] class SessionState(sparkSession: SparkSession) {
       val sessionCatalog = externalCatalog.getSessionCatalog(catalog)
       catalog.internalCatalog.registerDataSource(SessionCatalog.DEFAULT_DATASOURCE, sessionCatalog)
     }
-    synchronized {
-      catalog._currentDataSource = SessionCatalog.DEFAULT_DATASOURCE
-      catalog._currentSessionCatalog = None
-    }
+    catalog.setCurrentDataSource(SessionCatalog.DEFAULT_DATASOURCE)
   }
 
   private def registerHiveCatalog() = {
@@ -123,15 +120,13 @@ private[sql] class SessionState(sparkSession: SparkSession) {
       if (sparkSession.sharedState.externalCatalog == null) {
         synchronized {
           if (sparkSession.sharedState.externalCatalog == null) {
-            catalog.internalCatalog.getExternalCatalog("hive")
+            sparkSession.sharedState.externalCatalog =
+              catalog.internalCatalog.getExternalCatalog("hive")
           }
         }
       }
     }
-    synchronized {
-      catalog._currentDataSource = "hive"
-      catalog._currentSessionCatalog = None
-    }
+    catalog.setCurrentDataSource("hive")
   }
 
   sparkSession.sparkContext.conf.get(CATALOG_IMPLEMENTATION.key,

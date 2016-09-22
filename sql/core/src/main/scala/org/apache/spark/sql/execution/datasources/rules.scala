@@ -24,7 +24,7 @@ import scala.util.control.NonFatal
 import org.apache.spark.sql.{AnalysisException, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.analysis._
-import org.apache.spark.sql.catalyst.catalog.{BucketSpec, CatalogRelation, CatalogTable, SessionCatalog}
+import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, Cast, RowOrdering}
 import org.apache.spark.sql.catalyst.plans.logical
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -283,11 +283,12 @@ case class PreprocessTableInsertion(conf: SQLConf) extends Rule[LogicalPlan] {
 /**
  * A rule to check whether the functions are supported only when Hive support is enabled
  */
-object HiveOnlyCheck extends (LogicalPlan => Unit) {
+case class HiveOnlyCheck(catalog: SessionCatalog) extends (LogicalPlan => Unit) {
   def apply(plan: LogicalPlan): Unit = {
     plan.foreach {
+      // should be extended for all nonexisting data sources: could be just a redundant check
       case CreateTable(tableDesc, _, Some(_))
-          if tableDesc.provider.get == "hive" =>
+          if tableDesc.provider.get == "hive" && !catalog.externalCatalogExists("hive") =>
         throw new AnalysisException("Hive support is required to use CREATE Hive TABLE AS SELECT")
 
       case _ => // OK

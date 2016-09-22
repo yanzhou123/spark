@@ -36,7 +36,9 @@ class FederationSuite extends QueryTest with SQLTestUtils with TestHiveSingleton
     spark.catalog.registerDataSource(c1)
 
     val hadoopConfig: Configuration = new Configuration(sparkContext.hadoopConfiguration)
-    val metastoreTempConf = HiveUtils.newTemporaryConfiguration(useInMemoryDerby = false)
+    val metastoreTempConf = HiveUtils.newTemporaryConfiguration(useInMemoryDerby = true) ++ Map(
+      ConfVars.SCRATCHDIR.varname -> TestHiveContext.makeScratchDir().toURI.toString
+    )
 
     metastoreTempConf.foreach { case (k, v) =>
       hadoopConfig.set(k, v)
@@ -49,9 +51,6 @@ class FederationSuite extends QueryTest with SQLTestUtils with TestHiveSingleton
     spark.catalog.registerDataSource(c2)
 
     assert(spark.catalog.getDataSourceList == List("abc", "hive", "xyz"))
-
-    sql("drop table if exists hive..t1")
-    sql("drop table if exists xyz..t2")
 
     sql("CREATE TABLE hive..t1(key INT, value INT)")
 
@@ -69,11 +68,17 @@ class FederationSuite extends QueryTest with SQLTestUtils with TestHiveSingleton
     Seq((1, 3), (2, 4), (3, 5), (4, 6)).toDF("key", "value")
       .write.mode("overwrite").insertInto("xyz..t2")
 
+    checkAnswer(sql("select * from hive..t1"),
+      Row(1, 2) :: Row(3, 4) :: Row(5, 6) :: Row(7, 8) :: Nil)
+
     checkAnswer(sql("select * from xyz..t2"),
       Row(1, 3) :: Row(2, 4) :: Row(3, 5) :: Row(4, 6) :: Nil)
 
     checkAnswer(
       sql("select tb1.key, tb2.value from t1 tb1, xyz..t2 tb2 where tb1.key == tb2.key"),
       Row(1, 3) :: Row(3, 5) :: Nil)
+
+    sql("drop table if exists hive..t1")
+    sql("drop table if exists xyz..t2")
   }
 }
