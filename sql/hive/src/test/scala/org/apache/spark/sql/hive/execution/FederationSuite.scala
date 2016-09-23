@@ -36,6 +36,7 @@ class FederationSuite extends QueryTest with SQLTestUtils with TestHiveSingleton
     val c1 = new InMemoryCatalog() { override val name = "abc" }
     spark.catalog.registerDataSource(c1)
 
+    // Use a different Derby DB for a different metastore connection
     val hadoopConfig: Configuration = new Configuration(sparkContext.hadoopConfiguration)
     val metastoreTempConf = HiveUtils.newTemporaryConfiguration(useInMemoryDerby = false) ++ Map(
       ConfVars.SCRATCHDIR.varname -> TestHiveContext.makeScratchDir().toURI.toString
@@ -51,7 +52,6 @@ class FederationSuite extends QueryTest with SQLTestUtils with TestHiveSingleton
     val conf = sparkContext.conf.clone
     conf.set("hive.metastore.warehouse.dir", tempConf.warehousePath)
 
-    // use another warehouse location
     val c2 = new HiveExternalCatalog(conf, hadoopConfig) {
       override val name = "xyz"
     }
@@ -66,6 +66,9 @@ class FederationSuite extends QueryTest with SQLTestUtils with TestHiveSingleton
     assert(spark.catalog.listTablesByDataSource("hive").map(_.table) == Seq("t1"))
     assert(spark.catalog.listTablesByDataSource("xyz").map(_.table) == Seq("t1"))
 
+    sql("CREATE TABLE hive..t2(key INT, value INT)")
+    sql("CREATE TABLE xyz..t2(key INT, value INT)")
+
     Seq((1, 2), (3, 4), (5, 6), (7, 8)).toDF("key", "value").write.mode("overwrite")
       .insertInto("hive..t1")
 
@@ -75,17 +78,43 @@ class FederationSuite extends QueryTest with SQLTestUtils with TestHiveSingleton
     Seq((1, 3), (2, 4), (3, 5), (4, 6)).toDF("key", "value")
       .write.mode("overwrite").insertInto("xyz..t1")
 
+    Seq((1, 20), (3, 40), (5, 60), (7, 80)).toDF("key", "value").write.mode("overwrite")
+      .insertInto("hive..t2")
+
+    Seq((1, 31), (2, 41), (3, 51), (4, 61)).toDF("key", "value").write.mode("overwrite")
+      .insertInto("xyz..t2")
+
     checkAnswer(sql("select * from hive..t1"),
       Row(1, 2) :: Row(3, 4) :: Row(5, 6) :: Row(7, 8) :: Nil)
 
     checkAnswer(sql("select * from xyz..t1"),
       Row(1, 3) :: Row(2, 4) :: Row(3, 5) :: Row(4, 6) :: Nil)
 
+    checkAnswer(sql("select * from hive..t2"),
+      Row(1, 20) :: Row(3, 40) :: Row(5, 60) :: Row(7, 80) :: Nil)
+
+    checkAnswer(sql("select * from xyz..t2"),
+      Row(1, 31) :: Row(2, 41) :: Row(3, 51) :: Row(4, 61) :: Nil)
+
     checkAnswer(
       sql("select tb1.key, tb2.value from hive..t1 tb1, xyz..t1 tb2 where tb1.key == tb2.key"),
       Row(1, 3) :: Row(3, 5) :: Nil)
 
-    sql("drop table if exists hive..t1")
-    sql("drop table if exists xyz..t1")
+    checkAnswer(
+      sql("select tb1.key, tb2.value from hive..t1 tb1, xyz..t2 tb2 where tb1.key == tb2.key"),
+      Row(1, 31) :: Row(3, 51) :: Nil)
+
+    checkAnswer(
+      sql("select tb1.key, tb2.value from hive..t2 tb1, xyz..t1 tb2 where tb1.key == tb2.key"),
+      Row(1, 3) :: Row(3, 5) :: Nil)
+
+    checkAnswer(
+      sql("select tb1.key, tb2.value from hive..t2 tb1, xyz..t2 tb2 where tb1.key == tb2.key"),
+      Row(1, 31) :: Row(3, 51) :: Nil)
+
+    sql("drop table hive..t1")
+    sql("drop table xyz..t1")
+    sql("drop table hive..t2")
+    sql("drop table xyz..t2")
   }
 }
