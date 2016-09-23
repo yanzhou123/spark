@@ -56,6 +56,12 @@ private[sql] class HiveSessionCatalog(
 
   self =>
 
+  // In a federated scenario a per-catalog current database is needed
+  override def setCurrentDatabase(db: String): Unit = {
+    super.setCurrentDatabase(db)
+    client.setCurrentDatabase(db)
+  }
+
   override def lookupRelation(name: TableIdentifier, alias: Option[String]): LogicalPlan = {
     val table = formatTableName(name.table)
     val database = name.database.map(db => {
