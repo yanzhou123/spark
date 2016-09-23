@@ -58,7 +58,9 @@ private[sql] class HiveSessionCatalog(
 
   override def lookupRelation(name: TableIdentifier, alias: Option[String]): LogicalPlan = {
     val table = formatTableName(name.table)
-    val database = name.database.map(formatDatabaseName)
+    val database = name.database.map(db => {
+      if (db.isEmpty) currentDb else formatDatabaseName(db)
+    }).orElse(Some(currentDb))
     val newName = name.copy(database = database, table = table, dataSource = name.dataSource)
     metastoreCatalog.lookupRelation(newName, alias)
   }
