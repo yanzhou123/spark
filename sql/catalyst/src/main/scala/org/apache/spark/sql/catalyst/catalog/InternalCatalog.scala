@@ -93,7 +93,8 @@ class InternalCatalog extends Serializable {
     }
   }
 
-  def registerDataSource(name: String, sessionCatalog: DataSourceSessionCatalog): Unit = {
+  def registerDataSource(sessionCatalog: DataSourceSessionCatalog): Unit = {
+    val name = sessionCatalog.externalCatalog.name
     externalCatalogMap.getOrElseUpdate(name, sessionCatalog.externalCatalog)
     val sparkSession = sessionCatalog.parent.sparkSession
     var created = false
@@ -108,18 +109,16 @@ class InternalCatalog extends Serializable {
     }
   }
 
-  def registerDataSource(name: String, provider: String, properties: Map[String, String],
+  def registerDataSource(provider: String, properties: Map[String, String],
                          sparkContext: SparkContext): Unit = {
-    var created = false
-    externalCatalogMap.getOrElseUpdate(name, {
-      created = true
-      InternalCatalog.reflect[ExternalCatalog, SparkConf, Configuration](provider,
-        sparkContext.conf, sparkContext.hadoopConfiguration)
-        .setProperties(properties)
-    })
-    if (!created) {
+    val externalCatalog = InternalCatalog.reflect[ExternalCatalog, SparkConf,
+      Configuration](provider, sparkContext.conf, sparkContext.hadoopConfiguration)
+      .setProperties(properties)
+    val name = externalCatalog.name
+    if (externalCatalogMap.contains(name)) {
       throw new DataSourceAlreadyExistsException(name)
     }
+    externalCatalogMap.put(name, externalCatalog)
   }
 
   // Due to the current module dependence from SQL core to catalyst with

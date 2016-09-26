@@ -106,7 +106,7 @@ private[sql] class SessionState(sparkSession: SparkSession) {
     if (!catalog.internalCatalog.dsExists(SessionCatalog.DEFAULT_DATASOURCE)) {
       val externalCatalog = new InMemoryCatalogReal(sparkSession.sparkContext.hadoopConfiguration)
       val sessionCatalog = externalCatalog.getSessionCatalog(catalog)
-      catalog.internalCatalog.registerDataSource(SessionCatalog.DEFAULT_DATASOURCE, sessionCatalog)
+      catalog.internalCatalog.registerDataSource(sessionCatalog)
     }
     catalog.setCurrentDataSource(SessionCatalog.DEFAULT_DATASOURCE)
   }
@@ -114,7 +114,7 @@ private[sql] class SessionState(sparkSession: SparkSession) {
   private def registerHiveCatalog() = {
     // TODO: make the check-and-put atomic
     if (!catalog.internalCatalog.dsExists("hive")) {
-      catalog.internalCatalog.registerDataSource("hive",
+      catalog.internalCatalog.registerDataSource(
         SessionCatalog.HIVE_EXTERNAL_CATALOG_CLASS_NAME,
         Map[String, String](), sparkSession.sparkContext)
       if (sparkSession.sharedState.externalCatalog == null) {
