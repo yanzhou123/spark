@@ -320,6 +320,8 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession,
    */
   object ParquetConversions extends Rule[LogicalPlan] {
     private def shouldConvertMetastoreParquet(relation: MetastoreRelation): Boolean = {
+      // the check on data source could be removed once data source scoped rules are introduced
+      relation.catalogTable.identifier.dataSource.get == externalCatalog.name &&
       relation.tableDesc.getSerdeClassName.toLowerCase.contains("parquet") &&
         catalog.convertMetastoreParquet
     }
@@ -360,6 +362,8 @@ private[hive] class HiveMetastoreCatalog(sparkSession: SparkSession,
    */
   object OrcConversions extends Rule[LogicalPlan] {
     private def shouldConvertMetastoreOrc(relation: MetastoreRelation): Boolean = {
+      // the check on data source could be removed once data source scoped rules are introduced
+      relation.catalogTable.identifier.dataSource.get == externalCatalog.name &&
       relation.tableDesc.getSerdeClassName.toLowerCase.contains("orc") &&
         catalog.convertMetastoreOrc
     }

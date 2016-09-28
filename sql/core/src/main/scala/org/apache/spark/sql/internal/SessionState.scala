@@ -156,7 +156,7 @@ private[sql] class SessionState(sparkSession: SparkSession) {
   /**
    * Logical query plan analyzer for resolving unresolved attributes and relations.
    */
-  lazy val analyzer: Analyzer = {
+  def analyzer: Analyzer = {
     new Analyzer(catalog, conf) {
       override val extendedResolutionRules = combine[Rule[LogicalPlan]](sessionCatalogs,
         (s: DataSourceSessionCatalog) => if (s.analyzer != null)
@@ -179,7 +179,7 @@ private[sql] class SessionState(sparkSession: SparkSession) {
   /**
    * Logical query plan optimizer.
    */
-  lazy val optimizer: Optimizer = new SparkOptimizer(catalog, conf, experimentalMethods) {
+  def optimizer: Optimizer = new SparkOptimizer(catalog, conf, experimentalMethods) {
     override def execute(plan: LogicalPlan): LogicalPlan = {
       super.execute(sessionCatalogs.foldLeft(plan) {
         (p, x) => if (x.optimizer != null) {
