@@ -112,6 +112,15 @@ class FederationSuite extends QueryTest with SQLTestUtils with TestHiveSingleton
       sql("select tb1.key, tb2.value from hive..t2 tb1, xyz..t2 tb2 where tb1.key == tb2.key"),
       Row(1, 31) :: Row(3, 51) :: Nil)
 
+    // self-joins
+    checkAnswer(
+      sql("select tb1.key, tb2.value from hive..t1 tb1, hive..t1 tb2 where tb1.key == tb2.key"),
+      Row(1, 2) :: Row(3, 4) :: Row(5, 6) :: Row(7, 8) :: Nil)
+
+    checkAnswer(
+      sql("select tb1.key, tb2.value from xyz..t2 tb1, xyz..t2 tb2 where tb1.key == tb2.key"),
+      Row(1, 31) :: Row(2, 41) :: Row(3, 51) :: Row(4, 61) :: Nil)
+
     sql("drop table hive..t1")
     sql("drop table xyz..t1")
     sql("drop table hive..t2")
