@@ -172,7 +172,7 @@ private[sql] class SessionState(sparkSession: SparkSession) {
           s.analyzer.extendedCheckRules
         } else {
           Nil
-        }) ++ Seq(PreWriteCheck(conf, catalog))
+        }) ++ Seq(PreWriteCheck(conf, catalog), HiveOnlyCheck(catalog))
     }
   }
 

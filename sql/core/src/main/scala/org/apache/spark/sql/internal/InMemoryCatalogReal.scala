@@ -39,22 +39,5 @@ class InMemoryCatalogReal(hadoopConfig: Configuration = new Configuration)
     extends InMemoryCatalog(hadoopConfig = hadoopConfig) {
   override def getSessionCatalog(sessionCatalog: SessionCatalog): DataSourceSessionCatalog =
     new DataSourceSessionCatalog(sessionCatalog, this,
-      sessionCatalog.conf, sessionCatalog.hadoopConf) {
-
-      override lazy val analyzer: Analyzer = new Analyzer(this, conf) {
-        override val extendedResolutionRules = Nil
-        override val extendedCheckRules = Seq(HiveOnlyCheck(sessionCatalog))
-      }
-
-      override lazy val optimizer: Optimizer = new SparkOptimizer(this,
-        sessionCatalog.conf.asInstanceOf[SQLConf], new ExperimentalMethods) {
-        override def batches = Nil
-      }
-
-      override def planner: Any = new SparkPlanner(
-        sessionCatalog.sparkSession.asInstanceOf[SparkSession].sparkContext,
-        sessionCatalog.conf.asInstanceOf[SQLConf], Nil) {
-        override def strategies: Seq[Strategy] = Nil
-      }
-    }
+      sessionCatalog.conf, sessionCatalog.hadoopConf)
 }
