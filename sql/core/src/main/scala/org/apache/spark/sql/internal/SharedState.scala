@@ -61,7 +61,7 @@ private[sql] class SharedState(val sparkContext: SparkContext) extends Logging {
   var externalCatalog: ExternalCatalog = sparkContext.conf.get(CATALOG_IMPLEMENTATION.key,
       SessionCatalog.DEFAULT_DATASOURCE) match {
     case SessionCatalog.DEFAULT_DATASOURCE =>
-      new InMemoryCatalogReal(sparkContext.hadoopConfiguration)
+      new InMemoryCatalog(hadoopConfig = sparkContext.hadoopConfiguration)
     case "hive" => InternalCatalog
       .reflect[ExternalCatalog, SparkConf, Configuration] (
         SessionCatalog.HIVE_EXTERNAL_CATALOG_CLASS_NAME,

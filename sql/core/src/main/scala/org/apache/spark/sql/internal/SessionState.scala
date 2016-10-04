@@ -104,7 +104,8 @@ private[sql] class SessionState(sparkSession: SparkSession) {
 
   private def registerDefaultCatalog() = {
     if (!catalog.internalCatalog.dsExists(SessionCatalog.DEFAULT_DATASOURCE)) {
-      val externalCatalog = new InMemoryCatalogReal(sparkSession.sparkContext.hadoopConfiguration)
+      val externalCatalog = new InMemoryCatalog(
+        hadoopConfig = sparkSession.sparkContext.hadoopConfiguration)
       val sessionCatalog = externalCatalog.getSessionCatalog(catalog)
       catalog.internalCatalog.registerDataSource(sessionCatalog)
     }
