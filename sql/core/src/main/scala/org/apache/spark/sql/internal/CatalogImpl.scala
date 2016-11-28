@@ -74,7 +74,8 @@ class CatalogImpl(sparkSession: SparkSession) extends Catalog {
    * Register a data source.
    */
   override def registerDataSource(externalCatalog: ExternalCatalog): Unit = {
-    sparkSession.sharedState.internalCatalog.registerDataSource(externalCatalog)
+    sparkSession.sharedState.internalCatalog.registerDataSource(
+      externalCatalog.getSessionCatalog(sparkSession.sessionState.catalog))
   }
 
   /**
@@ -95,7 +96,8 @@ class CatalogImpl(sparkSession: SparkSession) extends Catalog {
   @throws[AnalysisException]("data source does not exist")
   def setCurrentDataSource(dataSource: String): Unit = {
     requireDataSourceExists(dataSource)
-     sessionCatalog.setCurrentDataSource(dataSource)
+    sessionCatalog.setCurrentDataSource(dataSource)
+    sessionCatalog.setCurrentSessionCatalog()
   }
 
   /**

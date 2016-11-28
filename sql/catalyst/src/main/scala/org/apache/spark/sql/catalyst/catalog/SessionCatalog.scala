@@ -212,7 +212,7 @@ class SessionCatalog(
   }
 
   def dataSourceExists(dataSource: String): Boolean = {
-    getCurrentDataSourceSessionCatalog.dataSourceExists(dataSource)
+    internalCatalog.dsExists(dataSource)
   }
 
   def listDatabases(): Seq[String] = {
