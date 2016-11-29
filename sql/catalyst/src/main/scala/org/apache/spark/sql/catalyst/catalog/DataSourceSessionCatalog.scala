@@ -29,7 +29,8 @@ import org.apache.spark.sql.catalyst.analysis.FunctionRegistry.FunctionBuilder
 import org.apache.spark.sql.catalyst.expressions.{Expression, ExpressionInfo}
 import org.apache.spark.sql.catalyst.optimizer.Optimizer
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias}
-import org.apache.spark.sql.catalyst.util.StringUtils
+import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.catalyst.trees.TreeNode
 
 object DataSourceSessionCatalog {
   val DEFAULT_DATABASE = "default"
@@ -773,4 +774,6 @@ class DataSourceSessionCatalog(
 
   // To avoid circular dependence from sql.internal to catalyst, using Any now: to be revisited
   def planner: Any = null
+
+  def preparations: Seq[Rule[TreeNode[_]]] = Nil
 }

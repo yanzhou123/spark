@@ -234,7 +234,12 @@ private[sql] class SessionState(sparkSession: SparkSession) {
   //  Helper methods, partially leftover from pre-2.0 days
   // ------------------------------------------------------
 
-  def executePlan(plan: LogicalPlan): QueryExecution = new QueryExecution(sparkSession, plan)
+  def executePlan(plan: LogicalPlan): QueryExecution = new QueryExecution(sparkSession, plan) {
+    // should the super's preparations always precede the custom ones ?
+    override def preparations: Seq[Rule[SparkPlan]] = super.preparations ++
+      combine[Rule[SparkPlan]](sessionCatalogs,
+        (s: DataSourceSessionCatalog) => s.preparations.asInstanceOf[Seq[Rule[SparkPlan]]])
+  }
 
   def refreshTable(tableName: String): Unit = {
     catalog.refreshTable(sqlParser.parseTableIdentifier(tableName))
